@@ -13,8 +13,9 @@ saves and physics match the original disc exactly.
 Windows build, through the title and NEW GAME into the opening cutscene
 and the Dock area. **USA (GGSEA4) boots, navigates its menus, and
 starts the game** — Konami/Dolby logos, stage data and the opening FMV
-all stream; a driven run from FMV into the codec call and Dock is the
-next verification. Upstream's phase plan is in
+all stream, and the drive continues into the real-time opening
+cutscene (submarine, "Alaska - Bering Sea"); the codec call and Dock
+are the next verification. Upstream's phase plan is in
 [MILESTONES.md](MILESTONES.md); the detail is in
 the fork-status section below. ([HANDOFF.md](HANDOFF.md) is upstream's
 running log and predates this fork's work.)
@@ -37,9 +38,10 @@ clang+lld; see PR #6 for the full recipe):
   symbols; PR #10); with its own patch table and module, scripted
   input drives it through the title, NEW GAME and difficulty menus,
   and GAME START — after which the Konami/Dolby logos play and the
-  opening FMV streams off the disc. The every-block REL regeneration
-  is still in progress, and the FMV → codec → Dock drive has not yet
-  been captured; a full US playthrough is not claimed.
+  opening FMV streams off the disc, and the drive continues into the
+  real-time opening cutscene. The every-block REL regeneration is
+  still in progress; the codec → Dock drive and a full US playthrough
+  are not yet claimed.
 - **Japan:** the GGSJA4 discs share the US `main.dol` byte-for-byte
   (only the REL differs), so the US work largely carries over. The
   Japanese Special Disc (PGSJ01 — emulated Famicom Metal Gear plus a
