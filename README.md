@@ -11,9 +11,10 @@ saves and physics match the original disc exactly.
 
 **Status (this fork, 2026-11-02): PAL (GGSPA4) is playable** — native
 Windows build, through the title and NEW GAME into the opening cutscene
-and the Dock area. **USA (GGSEA4) boots and is menu-navigable**, with
-game start streaming stage data; a driven run into gameplay is in
-progress. Upstream's phase plan is in
+and the Dock area. **USA (GGSEA4) boots, navigates its menus, and
+starts the game** — Konami/Dolby logos, stage data and the opening FMV
+all stream; a driven run from FMV into the codec call and Dock is the
+next verification. Upstream's phase plan is in
 [MILESTONES.md](MILESTONES.md); the detail is in
 the fork-status section below. ([HANDOFF.md](HANDOFF.md) is upstream's
 running log and predates this fork's work.)
@@ -31,12 +32,14 @@ clang+lld; see PR #6 for the full recipe):
   cutscene, and the playable Dock area, presented in a window over
   Vulkan. Host test suite: 22/22. Scripted keyboard input drove every
   transition; extended runs passed 13,000 frames without a fault.
-- **USA (GGSEA4) boots and is menu-navigable.** Its symbol map was
-  byte-transferred from PAL (953 of 1,058 sized symbols; PR #10), it
-  has its own patch table and module, and scripted input drives it
-  through the title and NEW GAME menus to the difficulty select. The
-  every-block REL regeneration and a driven run into the opening
-  cutscene are still in progress; a full US playthrough is not claimed.
+- **USA (GGSEA4) boots, navigates menus, and starts the game.** Its
+  symbol map was byte-transferred from PAL (953 of 1,058 sized
+  symbols; PR #10); with its own patch table and module, scripted
+  input drives it through the title, NEW GAME and difficulty menus,
+  and GAME START — after which the Konami/Dolby logos play and the
+  opening FMV streams off the disc. The every-block REL regeneration
+  is still in progress, and the FMV → codec → Dock drive has not yet
+  been captured; a full US playthrough is not claimed.
 - **Japan:** the GGSJA4 discs share the US `main.dol` byte-for-byte
   (only the REL differs), so the US work largely carries over. The
   Japanese Special Disc (PGSJ01 — emulated Famicom Metal Gear plus a
