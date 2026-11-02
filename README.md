@@ -9,9 +9,14 @@ GameCube SDK on SDL3 and Vulkan. At runtime there is no PowerPC, no interpreter
 and no JIT: the game's own logic runs as native machine code, so behaviour,
 saves and physics match the original disc exactly.
 
-**Status: phase 0 of 6** — symbol recovery. Not playable, not close. See
-[MILESTONES.md](MILESTONES.md) for the plan and [HANDOFF.md](HANDOFF.md) for
-where the work actually stands.
+**Status (this fork, 2026-11-02): PAL (GGSPA4) is playable** — native
+Windows build, through the title and NEW GAME into the opening cutscene
+and the Dock area. **USA (GGSEA4) boots and is menu-navigable**, with
+game start streaming stage data; a driven run into gameplay is in
+progress. Upstream's phase plan is in
+[MILESTONES.md](MILESTONES.md); the detail is in
+the fork-status section below. ([HANDOFF.md](HANDOFF.md) is upstream's
+running log and predates this fork's work.)
 
 ---
 
