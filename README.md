@@ -51,12 +51,17 @@ clang+lld; see PR #6 for the full recipe):
   into the playable Dock with the LIFE HUD up and Snake moving
   under arrow-key input. A full US playthrough is not yet claimed.
 - **Japan:** the GGSJA4 discs share the US `main.dol` byte-for-byte
-  (only the REL differs), so the US work largely carries over. The
+  (only the REL differs), so the US work largely carries over. Its
+  module builds (see the `_fltused` note on PR #9) and runs: headless
+  800M steps with no fault, and a scripted windowed drive passes the
+  menu, the codec call on 140.85 (Japanese text), and reaches the
+  Cargo Dock with the LIFE HUD up. In-game movement under input is
+  not yet verified on this build. The
   Japanese Special Disc (PGSJ01 — emulated Famicom Metal Gear plus a
   trailer) is a separate title and can never be a Twin Snakes disc.
 
-Nine pull requests from this fork are open and ready for review
-upstream (alphanu1/msg-twinsnakes-recomp #2–#10): the Windows build
+Ten pull requests from this fork are open and ready for review
+upstream (alphanu1/msg-twinsnakes-recomp #2–#10 and #12): the Windows build
 and disc tooling, the DolRecomp patch fixes, and the GGSEA4 bring-up
 above. Nothing disc-derived is in this repository; you supply your own
 discs, exactly as upstream requires.
@@ -78,7 +83,7 @@ names.
 |---|---|---|
 | PAL GGSPA4 | Playable Dock area, windowed Vulkan | Scripted input through logo, FMV, title, NEW GAME, codec, cutscene |
 | USA GGSEA4 | Playable Dock area, windowed | Scripted input through menus, GAME START, codec 140.85, cutscene; headless 800M steps, no fault |
-| Japan GGSJA4 | Discs identified; shares the US main.dol byte-for-byte | Extraction and hash verification only |
+| Japan GGSJA4 | Cargo Dock reached, windowed (movement not yet verified) | Scripted input through menu, codec 140.85 (Japanese text), to the Dock with LIFE HUD; headless 800M steps, no fault |
 | Japan PGSJ01 (Special Disc) | Standalone title — never a Twin Snakes disc | Archive inventory (Famicom Metal Gear + trailer) |
 
 Still unproven on every build: a complete human playthrough,
