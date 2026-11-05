@@ -9,7 +9,7 @@ GameCube SDK on SDL3 and Vulkan. At runtime there is no PowerPC, no interpreter
 and no JIT: the game's own logic runs as native machine code, so behaviour,
 saves and physics match the original disc exactly.
 
-**Status (this fork, 2026-11-03): PAL (GGSPA4) is playable** — native
+**Status (this fork, 2026-11-04): all three builds (PAL GGSPA4, USA GGSEA4, Japan GGSJA4) reach the Dock, and player movement under input is verified on each** — native
 Windows build, through the title and NEW GAME into the opening cutscene
 and the Dock area. **USA (GGSEA4) also reaches its opening cutscene** —
 Konami/Dolby logos, menus and GAME START, the opening FMV and the
@@ -17,9 +17,12 @@ real-time cutscene (submarine, "Alaska - Bering Sea") all play with
 sound and no fault, after the last PAL-pinned host/module addresses
 were made per-build (PRs #9/#10) — and a windowed drive now takes
 the US build through the codec call (Campbell, 140.85) into the
-Dock area, the same milestone PAL reached first. Movement under
-input is not yet verified on any build (see PR #9, 2026-11-04
-update). Upstream's
+Dock area, the same milestone PAL reached first. The movement blocker was a single host bug,
+not per-build: the synthesized controller poll response lacked the
+analog-valid bit (0x80 in reply byte 1) that real controllers always
+set, so the SDK zeroed both sticks on every build while buttons kept
+working (PR #13). Progression past the Dock, save/load over a long
+session, and a full human playthrough are not yet claimed. Upstream's
 phase plan is in
 [MILESTONES.md](MILESTONES.md); the detail is in
 the fork-status section below. ([HANDOFF.md](HANDOFF.md) is upstream's
@@ -38,8 +41,8 @@ clang+lld; see PR #6 for the full recipe):
   cutscene, and the Dock area, presented in a window over
   Vulkan. Host test suite: 22/22. Scripted keyboard input drove every
   transition; extended runs passed 13,000 frames without a fault.
-  (Earlier wording here said "playable"; movement under input has
-  since failed to reproduce - see the 2026-11-04 note on PR #9.)
+  Movement under input is verified (held stick at the Dock,
+  2026-11-04; see PR #13 for the root cause it was blocked on).
 - **USA (GGSEA4) reaches its opening cutscene.** Its symbol map was
   byte-transferred from PAL (953 of 1,058 sized symbols; PR #10);
   with its own patch table and module, scripted input drives it
@@ -52,22 +55,21 @@ clang+lld; see PR #6 for the full recipe):
   800M steps with the movie advancing and mixed audio, no fault and
   no workaround flags, and a scripted windowed drive goes through
   the menus and GAME START, the codec call (Campbell, 140.85), and
-  into the Dock with the LIFE HUD up. (An earlier revision said
-  Snake moved under arrow-key input; re-examination of the archived
-  frames does not support that - movement is unverified, see PR #9.)
+  into the Dock with the LIFE HUD up. Movement under input is
+  verified (held stick at the Dock, 2026-11-04; see PR #13).
   A full US playthrough is not yet claimed.
 - **Japan:** the GGSJA4 discs share the US `main.dol` byte-for-byte
   (only the REL differs), so the US work largely carries over. Its
   module builds (see the `_fltused` note on PR #9) and runs: headless
   800M steps with no fault, and a scripted windowed drive passes the
   menu, the codec call on 140.85 (Japanese text), and reaches the
-  Cargo Dock with the LIFE HUD up. In-game movement under input is
-  not yet verified on this build. The
+  Cargo Dock with the LIFE HUD up. Movement under input is
+  verified (held stick at the Dock, 2026-11-04; see PR #13). The
   Japanese Special Disc (PGSJ01 — emulated Famicom Metal Gear plus a
   trailer) is a separate title and can never be a Twin Snakes disc.
 
-Ten pull requests from this fork are open and ready for review
-upstream (alphanu1/msg-twinsnakes-recomp #2–#10 and #12): the Windows build
+Eleven pull requests from this fork are open and ready for review
+upstream (alphanu1/msg-twinsnakes-recomp #2–#10, #12 and #13): the Windows build
 and disc tooling, the DolRecomp patch fixes, and the GGSEA4 bring-up
 above. Nothing disc-derived is in this repository; you supply your own
 discs, exactly as upstream requires.
@@ -78,7 +80,7 @@ The phase tracker below is upstream's and is unchanged.
 
 ---
 
-## Progress (this fork — verified by running, 2026-11-03)
+## Progress (this fork — verified by running, 2026-11-04)
 
 Progress here is measured by how far each build actually runs on the
 native Windows build, not by symbol counts: a build whose code is
@@ -87,9 +89,9 @@ names.
 
 | Build | Verified furthest point | How |
 |---|---|---|
-| PAL GGSPA4 | Dock area reached, windowed Vulkan (movement unverified) | Scripted input through logo, FMV, title, NEW GAME, codec, cutscene |
-| USA GGSEA4 | Dock area reached, windowed (movement unverified) | Scripted input through menus, GAME START, codec 140.85, cutscene; headless 800M steps, no fault |
-| Japan GGSJA4 | Cargo Dock reached, windowed (movement not yet verified) | Scripted input through menu, codec 140.85 (Japanese text), to the Dock with LIFE HUD; headless 800M steps, no fault |
+| PAL GGSPA4 | Dock area reached, windowed Vulkan; movement verified | Scripted input through logo, FMV, title, NEW GAME, codec, cutscene; held stick displaces Snake at the Dock |
+| USA GGSEA4 | Dock area reached, windowed; movement verified | Scripted input through menus, GAME START, codec 140.85, cutscene; held stick displaces Snake at the Dock; headless 800M steps, no fault |
+| Japan GGSJA4 | Cargo Dock reached, windowed; movement verified | Scripted input through menu, codec 140.85 (Japanese text), to the Dock with LIFE HUD; held stick displaces Snake at the Dock; headless 800M steps, no fault |
 | Japan PGSJ01 (Special Disc) | Standalone title — never a Twin Snakes disc | Archive inventory (Famicom Metal Gear + trailer) |
 
 Still unproven on every build: a complete human playthrough,
