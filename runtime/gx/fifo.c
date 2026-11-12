@@ -668,6 +668,12 @@ static void feed(MgsGx* gx, const uint8_t* data, unsigned n)
          * mis-sized upstream - the bytes around it do. */
         gx->recent[gx->recent_at++ & 511u] = data[i];
 
+        /* Swallowing the rest of a dropped oversize command. Its bytes
+         * are vertex data, not opcodes; parsing them as opcodes is how
+         * one legitimately-too-long primitive turned into hundreds of
+         * secondary desyncs and a lost stream. */
+        if (gx->skip) { --gx->skip; continue; }
+
         if (!gx->want && !gx->have) {
             gx->opcode = data[i];
             if (gx->opcode == GX_OP_NOP || gx->opcode == GX_OP_INVL_VC) {
@@ -724,9 +730,15 @@ static void feed(MgsGx* gx, const uint8_t* data, unsigned n)
             }
             if (len > sizeof gx->buf) {
                 /* A legitimate but very long vertex run. Dropped rather than
-                 * mis-parsed, and counted so it is visible. */
+                 * mis-parsed, and counted so it is visible - and SKIPPED:
+                 * resetting without skipping leaves the run's remaining
+                 * bytes to be reparsed as opcodes, which loses the stream
+                 * exactly as surely as the undersized buffer in fifo.h's
+                 * history did. `len` is the body length (the opcode is
+                 * already consumed) and `have` of it is already in. */
                 desync(gx, "vertex run longer than the staging buffer",
                        gx->opcode, len);
+                gx->skip = len - gx->have;
                 gx->have = gx->want = 0u;
                 continue;
             }

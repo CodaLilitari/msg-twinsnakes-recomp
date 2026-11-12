@@ -16357,3 +16357,25 @@ whose header differs between the two discs. What remains unproven is
 the story-flow swap itself on any build (Phase 5), a real save
 (F381), and everything past the Dock.
 
+### F388 (fork, 2026-11-11) — NTSC cadence read live; oversize draws skipped, not reparsed
+
+Two host defects the USA build exposed. (1) The window's fps cap was
+decided at startup, before the guest programmes VI, when the register
+still reads its NTSC reset value — so the cap was 60 on every disc,
+and the cadence report divided by a hardcoded 50 even for GGSEA4
+("36.75 fps at 50.000 Hz"). `mgs_mmio_vi_field_rate()` now answers
+from the programmed format at the moment of use; the cap follows it
+(MGS_FPS_CAP still overrides) and the report uses it.
+`tests/test_vi_ticks.c` pins ticks+rate per format. Guest retrace
+pacing already read the register live and was correct.
+
+(2) The 1,483 GX desyncs of the long Dock run: 503 legitimate vertex
+runs exceed the 64 KB staging buffer. The oversize path dropped the
+command but did not skip its bytes, so the rest of each run was
+reparsed as opcodes — the cascade, not the drop, was the desync
+count. The parser now swallows the remainder (`gx->skip`), counting
+exactly one desync per dropped run; the geometry is still dropped
+(raising the buffer needs the observed run lengths first).
+`tests/test_gx.c` covers it with non-NOP filler — zero bytes would
+have hidden the cascade, as they did on the first attempt here.
+

@@ -240,6 +240,8 @@ typedef struct MgsGx {
     uint8_t  dl_save[4096];
     unsigned have;
     unsigned want;                       /* 0 = opcode not yet decoded */
+    unsigned skip;                       /* bytes of a dropped oversize
+                                          * command still to swallow */
     uint8_t  opcode;
 
     /* Display lists are executed inline, and may nest. A depth limit turns a

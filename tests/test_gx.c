@@ -236,6 +236,43 @@ int main(void)
         CHECK(gx.vcd_lo == 0x00000200u);
     }
 
+    /* --- an oversize vertex run must not lose the stream ---------------- */
+    {
+        /* A primitive larger than the staging buffer is dropped - that is
+         * the documented oversize path - but its bytes must be SKIPPED, not
+         * reparsed as opcodes. Reparsing them cascades into hundreds of
+         * secondary desyncs and loses every command until the stream
+         * happens to resynchronise (measured on the USA Dock: 503 oversize
+         * runs became 1,483 desyncs). After the drop, the next command
+         * must land exactly. */
+        uint64_t tris = gx.triangles, desyncs = gx.desyncs;
+        unsigned i;
+        gx.vcd_lo = (1u << 9) | (1u << 13);          /* 16-byte vertices */
+        gx.vcd_hi = 0;
+        gx.vat_a[0] = (1u << 0) | (4u << 1) | (1u << 13) | (5u << 14);
+
+        /* 5000 vertices * 16 bytes = 80,000 > the 64 KB staging buffer.
+         * The filler is 0xFF, not 0x00: zero bytes are NOP opcodes and
+         * would be silently consumed by a reparsing parser, hiding the
+         * very cascade this checks for. */
+        put8(GX_OP_DRAW_FIRST | (GX_PRIM_TRIANGLES << 3) | 0u);
+        put16(5000u);
+        for (i = 0; i < 5000u * 4u; ++i) put32(0xFFFFFFFFu);
+
+        /* Exactly one desync: the drop itself, counted as before. */
+        CHECK(gx.desyncs == desyncs + 1u);
+        CHECK(gx.triangles == tris);                 /* dropped, not drawn */
+
+        /* And the stream is still aligned: a following triangle parses. */
+        put8(GX_OP_DRAW_FIRST | (GX_PRIM_TRIANGLES << 3) | 0u);
+        put16(3);
+        for (i = 0; i < 3u; ++i) {
+            put32(0u); put32(0u); put32(0u); put32(0xFFFFFFFFu);
+        }
+        CHECK(gx.triangles == tris + 1u);
+        CHECK(gx.desyncs == desyncs + 1u);
+    }
+
     /* --- the scissor box ------------------------------------------------ */
     {
         /* The hardware will not write outside the scissor, so a renderer that
