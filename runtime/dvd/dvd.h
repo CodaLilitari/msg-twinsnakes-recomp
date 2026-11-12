@@ -117,6 +117,13 @@ typedef struct MgsDvdRequest {
     uint32_t  guest_block;       /* DVDCommandBlock*, for the status the game polls */
 
     struct MgsDvd* owner;
+
+    /* The disc this request reads from, captured at submit time. A swap
+     * (mgs_disc_set_select) changes which disc is "in the drive"; a read
+     * already queued was issued against the old disc and must finish
+     * against it, while every later read must follow the swap. Capturing
+     * per request is what makes both true. */
+    MgsDisc*  disc;
 } MgsDvdRequest;
 
 typedef struct MgsDvd {

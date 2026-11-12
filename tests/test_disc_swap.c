@@ -95,6 +95,29 @@ int main(void)
             CHECK(guest_read8(&g_rt.mem, 0x80000006u) == 1u);
             CHECK(mgs_disc_set_active() == &d2);
 
+            /* READS FOLLOW THE SWAP. The host binds its MgsDvd to disc 1
+             * once at startup (host/main.c); if reads keep serving that
+             * disc, the identity byte above says "disc 2" while every
+             * byte still comes off disc 1 and the story loads the wrong
+             * data. stage.dat exists on both discs with different bytes
+             * (its header names the disc's own size), which makes which
+             * disc served a read observable. */
+            {
+                MgsDvd dvd;
+                MgsJobPool* jobs = mgs_jobs_create(0u);
+                uint8_t want1[64], want2[64];
+                CHECK(jobs != NULL);
+                CHECK(mgs_disc_read(&d1, "stage.dat", want1, 0u, 64u) == 64L);
+                CHECK(mgs_disc_read(&d2, "stage.dat", want2, 0u, 64u) == 64L);
+                CHECK(memcmp(want1, want2, 64) != 0); /* else no signal */
+                mgs_dvd_init(&dvd, &d1, jobs, &g_rt.mem);
+                CHECK(mgs_dvd_read_sync(&dvd, "stage.dat", 0x80400000u,
+                                        0u, 64u) == 64L);
+                CHECK(memcmp(guest_ptr(&g_rt.mem, 0x80400000u, 64u),
+                             want2, 64) == 0);
+                mgs_jobs_destroy(jobs);
+            }
+
             /* Back again, because the story does come back. */
             CHECK(mgs_disc_set_select(0u));
             CHECK(guest_read8(&g_rt.mem, 0x80000006u) == 0u);

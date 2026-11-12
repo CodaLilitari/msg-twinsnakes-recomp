@@ -27,6 +27,17 @@ static MgsRuntime* s_rt;
 void mgs_dvd_bind(MgsRuntime* rt, MgsDvd* dvd);
 void mgs_dvd_bind(MgsRuntime* rt, MgsDvd* dvd) { s_rt = rt; s_dvd = dvd; }
 
+/* Which disc an FST lookup names files on: the disc set's active disc once
+ * a swap has selected one, else the disc the MgsDvd was initialised with.
+ * Entry numbers and offsets are per-disc (each disc carries its own FST),
+ * so a lookup left on disc 1 after the swap resolves names against the
+ * wrong table even if the read itself followed. */
+static MgsDisc* shim_disc(void)
+{
+    MgsDisc* active = mgs_disc_set_active();
+    return (active && active->mounted) ? active : s_dvd->disc;
+}
+
 /* Copy a guest string out, bounded. Guest strings are not trusted to be
  * terminated: an unbounded read here walks 24 MB.
  */
@@ -50,7 +61,7 @@ void mgs_DVDConvertPathToEntrynum(CPUState* ctx)
     uint32_t entry;
 
     guest_string(mgs_guest_gpr(s_rt, 3), path, sizeof path);
-    entry = mgs_fst_find(&s_dvd->disc->fst, path);
+    entry = mgs_fst_find(&shim_disc()->fst, path);
 
     /* The SDK returns -1 for "not found", and 0 is the root - which is a
      * valid entry number but never a file, so it cannot be used as failure.
@@ -65,7 +76,7 @@ void mgs_DVDFastOpen(CPUState* ctx)
     uint32_t fi = mgs_guest_gpr(s_rt, 4);
     MgsFstEntry e;
 
-    if (!fi || !mgs_fst_entry(&s_dvd->disc->fst, entry, &e) || e.is_dir) {
+    if (!fi || !mgs_fst_entry(&shim_disc()->fst, entry, &e) || e.is_dir) {
         mgs_set_guest_gpr(s_rt, 3, 0u);        /* FALSE */
         return;
     }
@@ -127,7 +138,7 @@ void mgs_DVDOpen(CPUState* ctx)
     uint32_t entry;
 
     guest_string(mgs_guest_gpr(s_rt, 3), path, sizeof path);
-    entry = mgs_fst_find(&s_dvd->disc->fst, path);
+    entry = mgs_fst_find(&shim_disc()->fst, path);
     if (getenv("MGS_TRACE_DVD"))
         fprintf(stderr, "[dvd] DVDOpen(\"%s\", 0x%08X) -> entry %u\n",
                 path, fi, entry);

@@ -16329,3 +16329,31 @@ Ben asked whether the launcher does the one-time build yet: no - it needs
 DolRecomp (with LLVM) and a linker carried inside the port and built for
 each platform; next launcher milestone.
 
+### F387 (fork, 2026-11-11) — one integrated tree, and reads follow the disc swap
+
+The fork's work lived on nine topic branches while pushed `main` was
+README-only. Branch `integrate-usa` now holds all of it on one tree:
+remappable-controls (GGSEA4 support + controls), si-poll-fix, the
+MGS_GAME_ID module stamping, the Windows native build scripts, the
+patch EOL guard, the C-backend guard and the disc extractor, with
+`main`'s README merged in. Verified from that tree alone: host rebuild,
+ctest 25/25, and the USA scripted title-to-Dock run (exit 0, 0 GX
+desync), then a held-stick run in which Snake runs across the Dock and
+alerts a guard ("Who's there?") — movement and Dock arrival shown in
+ONE build for the first time. That longer run also shows 1,483 GX
+desyncs (vertex staging buffer / unknown opcode) once the fuller Dock
+scene is live; the short Dock-idle runs show 0. Open defect, recorded
+here rather than smoothed over.
+
+**Disc swap, the missing half.** F48's mechanism changed only which
+disc the ID byte at MEM1+6 names. The read path never followed:
+`MgsDvd` was bound to disc 1 at startup and every read and FST lookup
+served disc 1 forever, so a mid-story swap would have loaded disc-1
+bytes under a disc-2 identity. Reads now capture the active disc at
+submit time (`MgsDvdRequest.disc`; a queued read finishes against the
+disc it was issued to) and the DVD shims resolve FST lookups against
+the active disc. `tests/test_disc_swap.c` proves it with stage.dat,
+whose header differs between the two discs. What remains unproven is
+the story-flow swap itself on any build (Phase 5), a real save
+(F381), and everything past the Dock.
+

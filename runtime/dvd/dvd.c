@@ -19,9 +19,9 @@ static void read_job(void* user)
 {
     MgsDvdRequest* req = (MgsDvdRequest*)user;
     req->result = req->absolute
-        ? mgs_disc_read_abs(req->owner->disc, req->host_buffer,
+        ? mgs_disc_read_abs(req->disc, req->host_buffer,
                             req->offset, req->length)
-        : mgs_disc_read(req->owner->disc, req->path,
+        : mgs_disc_read(req->disc, req->path,
                         req->host_buffer, req->offset, req->length);
 
     /* MGS_TRACE_DVD=1 names every read. A read that silently returns -1 is
@@ -99,6 +99,14 @@ static MgsDvdRequest* dvd_build_and_submit(MgsDvd* dvd, const char* path,
     req->in_use = 1;
     req->absolute = absolute;
     req->owner = dvd;
+    /* Resolve the disc NOW, on the guest thread, before submit (the same
+     * every-field-before-submit contract as `absolute` above): the disc
+     * set's active disc if a set is bound and mounted, else the disc this
+     * MgsDvd was initialised with (single-disc and test setups). */
+    {
+        MgsDisc* active = mgs_disc_set_active();
+        req->disc = (active && active->mounted) ? active : dvd->disc;
+    }
     snprintf(req->path, sizeof req->path, "%s", path);
     req->guest_dest = guest_dest;
     req->offset = offset;
