@@ -74,6 +74,20 @@ and disc tooling, the DolRecomp patch fixes, and the GGSEA4 bring-up
 above. Nothing disc-derived is in this repository; you supply your own
 discs, exactly as upstream requires.
 
+**Update 2026-11-11:** that work is now integrated on one branch
+(`integrate-usa`: USA support, remappable controls, the SI poll fix,
+per-build module stamping, Windows tooling) and re-verified from that
+tree alone — host rebuild, tests 26/26, USA scripted title-to-Dock
+(exit 0, 0 GX desync) and held-stick movement at the Dock in the same
+build. Since then: disc reads and FST lookups follow the disc swap
+(before, only the identity byte changed; see HANDOFF F387), the field
+rate is read live from the guest's programmed format (USA runs now
+report 60 Hz, not 50), oversize vertex runs are skipped rather than
+reparsed, and `MGS_PAD_SCRIPT` accepts 1024 entries. Still not
+claimed: a save (Mei Ling does not answer at the Dock before her
+introduction — a memory-card write is unproven on every build), the
+story disc swap, and anything past the Dock.
+
 What is still not proven, on either build: a complete human
 playthrough, saving/loading over a long session, and the later areas.
 The phase tracker below is upstream's and is unchanged.
