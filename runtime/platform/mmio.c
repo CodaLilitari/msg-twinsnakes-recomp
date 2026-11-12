@@ -376,7 +376,7 @@ void mgs_mmio_init(MgsMmio* m)
         {
             const char* q = getenv("MGS_PAD_SCRIPT");
             m->pad_script_n = 0u;
-            while (q && *q && m->pad_script_n < 128u) {
+            while (q && *q && m->pad_script_n < MGS_PAD_SCRIPT_MAX) {
                 char* end;
                 unsigned long fr = strtoul(q, &end, 0);
                 if (end == q || *end != ':') break;
@@ -396,6 +396,10 @@ void mgs_mmio_init(MgsMmio* m)
                 ++m->pad_script_n;
                 q = (*end == ',') ? end + 1 : end;
             }
+            if (q && *q)
+                fprintf(stderr, "[pad] MGS_PAD_SCRIPT truncated at %u "
+                                "entries; the rest never reach the game\n",
+                        (unsigned)MGS_PAD_SCRIPT_MAX);
         }
     }
 

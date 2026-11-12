@@ -167,10 +167,15 @@ typedef struct MgsMmio {
      * ticks of a 40.5 MHz clock - 20 ms, 50.000 a second - so this is
      * the denominator for any honest statement about frame rate. */
     uint64_t field_count;
-    uint32_t pad_script_frame[128];  /* MGS_PAD_SCRIPT */
-    uint16_t pad_script_btn[128];
-    uint8_t  pad_script_sx[128];   /* optional :sx:sy stick bytes (hex) */
-    uint8_t  pad_script_sy[128];
+    /* MGS_PAD_SCRIPT. 1024, not 128: a boot-to-gameplay script runs to
+     * hundreds of entries (title alone ~112), and the old cap silently
+     * dropped everything past it - the run's early inputs worked and
+     * its later ones, usually the point of the run, never arrived. */
+#define MGS_PAD_SCRIPT_MAX 1024u
+    uint32_t pad_script_frame[MGS_PAD_SCRIPT_MAX];
+    uint16_t pad_script_btn[MGS_PAD_SCRIPT_MAX];
+    uint8_t  pad_script_sx[MGS_PAD_SCRIPT_MAX];   /* optional :sx:sy (hex) */
+    uint8_t  pad_script_sy[MGS_PAD_SCRIPT_MAX];
     unsigned pad_script_n;
     uint32_t pad_frame;
     uint16_t pad_reported;

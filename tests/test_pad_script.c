@@ -51,6 +51,30 @@ int main(void)
     CHECK(m.pad_forced == 0);
     CHECK(m.pad_stick_x == 0x80 && m.pad_stick_y == 0x80);
 
+    /* A full boot-to-gameplay script is hundreds of entries (the title
+     * sequence alone is ~112). The cap once sat at 128 and silently
+     * dropped the rest, so a scripted run's later inputs - the ones
+     * under test - never reached the game while its early menu inputs
+     * worked, which read as the game ignoring input rather than as a
+     * truncated script. The whole script must land, last entry too. */
+    {
+        static char big[8192];
+        size_t off = 0;
+        int k;
+        MgsMmio m2;
+        for (k = 0; k < 300; ++k)
+            off += (size_t)snprintf(big + off, sizeof big - off,
+                                    "%s%d:0100", k ? "," : "", k * 10);
+#ifdef _WIN32
+        _putenv_s("MGS_PAD_SCRIPT", big);
+#else
+        setenv("MGS_PAD_SCRIPT", big, 1);
+#endif
+        mgs_mmio_init(&m2);
+        CHECK(m2.pad_script_n == 300u);
+        CHECK(m2.pad_script_frame[299] == 2990u);
+    }
+
     printf(failures ? "%d failure(s)\n" : "all pad_script checks passed\n", failures);
     return failures != 0;
 }
