@@ -1948,18 +1948,18 @@ int main(int argc, char** argv)
         /* A window gets paced to a frame rate; a headless run does not,
          * because sleeping on the host clock would make it unreproducible
          * and reproducibility is the whole point of the headless path. */
-        /* THE FIELD RATE OF THE DISC, NOT 60. This is the PAL release and
-         * the guest programs VI for PAL (confirmed against the console:
+        /* THE FIELD RATE OF THE DISC, NOT 60. The PAL release's guest
+         * programs VI for PAL (confirmed against the console:
          * VIGetTvFormat's variable reads 1, and its retrace counter
          * advances 50 a second), so pacing presentation at 60 ran the
          * window 20% fast - the same NTSC assumption F266 found in the
          * retrace period, left behind here.
          *
-         * Read from the guest's own register rather than hardcoded, so a
-         * 60 Hz mode would be honoured if the game were put in one. */
-        mgs_display_set_fps_cap(headless ? 0u
-                                : (mgs_mmio_vi_is_pal(mgs_host_mmio()) ? 50u
-                                                                       : 60u));
+         * This runs before the guest does, when VI still reads its NTSC
+         * reset value, so deciding 50-vs-60 HERE decided NTSC on every
+         * disc. A nonzero cap now only enables pacing; display.c reads
+         * the guest's programmed rate live (mgs_mmio_vi_field_rate). */
+        mgs_display_set_fps_cap(headless ? 0u : 60u);
     }
     printf("worker pool: %u threads\n", mgs_jobs_worker_count(jobs));
     /* SAY WHAT THE RENDERER ACTUALLY IS.
@@ -3610,12 +3610,15 @@ int main(int argc, char** argv)
                                (unsigned long long)mgs_interrupt_redelivered());
                         {   /* THE CADENCE, EXACTLY. PAL is 50.000 fields a
                              * second, so a cutscene drawing one frame per
-                             * two fields is 25.000 fps and not "about 25".
-                             * Anything slower is frames that took three
-                             * fields, and this counts them rather than
-                             * rounding them away - which I did twice. */
+                             * two fields is 25.000 fps and not "about 25"
+                             * (NTSC: 60 fields, 30 fps - the rate is the
+                             * guest's programmed one, read live, not a
+                             * hardcoded 50). Anything slower is frames
+                             * that took three fields, and this counts them
+                             * rather than rounding them away. */
                             void mgs_display_field_hist(uint64_t*);
                             uint64_t h[8]; unsigned k; uint64_t tot = 0, wf = 0;
+                            unsigned rate = mgs_mmio_vi_field_rate(mgs_host_mmio());
                             mgs_display_field_hist(h);
                             for (k = 0; k < 8u; ++k) { tot += h[k]; wf += h[k]*k; }
                             if (tot) {
@@ -3625,9 +3628,10 @@ int main(int argc, char** argv)
                                                      k == 1u ? "" : "s",
                                                      (unsigned long long)h[k]);
                                 printf("   mean %.3f fields/frame = %.2f fps "
-                                       "at 50.000 Hz\n",
+                                       "at %u.000 Hz\n",
                                        (double)wf / (double)tot,
-                                       wf ? 50.0 * (double)tot / (double)wf : 0.0);
+                                       wf ? (double)rate * (double)tot / (double)wf : 0.0,
+                                       rate);
                             }
                         }
                         {   /* And what the viewer gets - see

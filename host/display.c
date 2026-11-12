@@ -62,8 +62,20 @@ static MgsEfb s_efb;
 static MgsGx  s_gx;
 static MgsGxRaster s_raster;
 
-/* Frame pacing. 0 means uncapped, which is what a headless run wants. */
+/* Frame pacing. 0 means uncapped, which is what a headless run wants.
+ * A nonzero cap with no MGS_FPS_CAP override follows the guest's own
+ * field rate, read live: the cap is set at startup, before VIConfigure
+ * programmes PAL or NTSC, so a value decided then is the reset value
+ * (NTSC) whatever disc is mounted. */
 static unsigned  s_fps_cap;
+static int       s_fps_cap_fixed;
+
+static unsigned effective_fps_cap(void)
+{
+    if (!s_fps_cap) return 0u;
+    if (s_fps_cap_fixed) return s_fps_cap;
+    return mgs_mmio_vi_field_rate(mgs_host_mmio());
+}
 static long long s_next_frame_ns;
 static long long s_present_due;
 static int       s_frame_timing = -1;
@@ -102,7 +114,7 @@ int mgs_display_may_present(void)
     if (!s_fps_cap) return 1;
     clock_gettime(CLOCK_MONOTONIC, &now);
     t = (long long)now.tv_sec * 1000000000ll + now.tv_nsec;
-    iv = 1000000000ll / (long long)s_fps_cap;
+    iv = 1000000000ll / (long long)effective_fps_cap();
     /* HALF A FRAME OF TOLERANCE, AND A SCHEDULE THAT DOES NOT DRIFT.
      *
      * The cap is the field rate and a present is offered once per field, so
@@ -209,11 +221,16 @@ void mgs_display_set_fps_cap(unsigned fps);
 void mgs_display_set_fps_cap(unsigned fps)
 {
     const char* e = getenv("MGS_FPS_CAP");
-    if (e && *e) fps = (unsigned)strtoul(e, NULL, 10);
+    s_fps_cap_fixed = (e && *e) ? 1 : 0;
+    if (s_fps_cap_fixed) fps = (unsigned)strtoul(e, NULL, 10);
     s_fps_cap = fps;
     s_next_frame_ns = 0ll;
-    if (fps) fprintf(stderr, "[video] frame rate capped at %u fps "
-                             "(MGS_FPS_CAP=0 to disable)\n", fps);
+    if (fps && s_fps_cap_fixed)
+        fprintf(stderr, "[video] frame rate capped at %u fps "
+                        "(MGS_FPS_CAP=0 to disable)\n", fps);
+    else if (fps)
+        fprintf(stderr, "[video] frame rate follows the guest field rate "
+                        "(MGS_FPS_CAP to override, 0 to disable)\n");
 }
 
 void mgs_display_set_jobs(void* pool)
@@ -941,7 +958,7 @@ no_readback:
          * nothing - see frame_pump in host/main.c. Nothing sleeps here. */
         if ((cmd & COPY_TO_XFB) && s_fps_cap) {
             struct timespec now;
-            long long period = 1000000000ll / (long long)s_fps_cap;
+            long long period = 1000000000ll / (long long)effective_fps_cap();
             clock_gettime(CLOCK_MONOTONIC, &now);
             {
                 long long t = (long long)now.tv_sec * 1000000000ll + now.tv_nsec;

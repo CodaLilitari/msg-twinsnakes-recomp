@@ -68,6 +68,16 @@ int mgs_mmio_vi_is_pal(const MgsMmio* m)
     return m && vi_format(m) == VI_DCR_FMT_PAL;
 }
 
+/* Fields per second for the programmed format, for the host's pacing and
+ * its end-of-run cadence report. Ask at the moment of use: the format is
+ * programmed by the guest's VIConfigure after boot, so an answer cached
+ * at startup is the reset value (NTSC) whatever disc is mounted. */
+unsigned mgs_mmio_vi_field_rate(const MgsMmio* m);
+unsigned mgs_mmio_vi_field_rate(const MgsMmio* m)
+{
+    return mgs_mmio_vi_is_pal(m) ? 50u : 60u;
+}
+
 /* External interface, by offset from MMIO_EXI. Three channels, 0x14 apart.
  *
  * EXIxCR bit 0 is TSTART: software sets it to begin a transfer and HARDWARE
