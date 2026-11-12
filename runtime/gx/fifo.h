@@ -224,14 +224,16 @@ typedef struct MgsGx {
      * bogus commands, because the garbage that followed eventually parsed as
      * a display-list call into arbitrary memory.
      *
-     * 64 KB covers about 3,200 vertices at this game's vertex size. It is
-     * NOT the hardware's worst case - GX allows 65,535 vertices in one
-     * primitive, which with a large vertex format is megabytes - so the
-     * oversize path remains, and now says so rather than counting silently.
+     * 64 KB covered about 3,200 vertices at this game's vertex size - and
+     * the USA Dock proved too small again: 9,400 legitimate runs over one
+     * Dock session exceeded it and were dropped (F388). 1 MiB covers the
+     * GX maximum count (65,535) at this game's 16-byte vertex size. It is
+     * still NOT the hardware's worst case - a maximum-count run in a
+     * large vertex format is megabytes - so the oversize path remains,
+     * skipping the run's remaining bytes rather than reparsing them.
      * Handling the true maximum means decoding vertices as they arrive
-     * instead of buffering the primitive, which is a larger change than this
-     * one and is not needed yet. */
-    uint8_t  buf[65536];
+     * instead of buffering the primitive, which is a larger change. */
+    uint8_t  buf[1048576];
 
     /* Where a nested display list parks the partial command it interrupted.
      * Four deep at most, and a partial command is small - a whole primitive

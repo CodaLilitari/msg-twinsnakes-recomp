@@ -236,7 +236,7 @@ int main(void)
         CHECK(gx.vcd_lo == 0x00000200u);
     }
 
-    /* --- an oversize vertex run must not lose the stream ---------------- */
+    /* --- long vertex runs: buffered at game scale, skipped past it ------ */
     {
         /* A primitive larger than the staging buffer is dropped - that is
          * the documented oversize path - but its bytes must be SKIPPED, not
@@ -244,26 +244,51 @@ int main(void)
          * secondary desyncs and loses every command until the stream
          * happens to resynchronise (measured on the USA Dock: 503 oversize
          * runs became 1,483 desyncs). After the drop, the next command
-         * must land exactly. */
+         * must land exactly. The filler is 0xFF, not 0x00: zero bytes are
+         * NOP opcodes and would be silently consumed by a reparsing
+         * parser, hiding the very cascade this checks for. */
         uint64_t tris = gx.triangles, desyncs = gx.desyncs;
         unsigned i;
         gx.vcd_lo = (1u << 9) | (1u << 13);          /* 16-byte vertices */
         gx.vcd_hi = 0;
         gx.vat_a[0] = (1u << 0) | (4u << 1) | (1u << 13) | (5u << 14);
 
-        /* 5000 vertices * 16 bytes = 80,000 > the 64 KB staging buffer.
-         * The filler is 0xFF, not 0x00: zero bytes are NOP opcodes and
-         * would be silently consumed by a reparsing parser, hiding the
-         * very cascade this checks for. */
+        /* 5000 vertices * 16 bytes = 80,000: over the old 64 KB buffer
+         * (the Dock's dropped scenery), inside the 1 MiB one. It must
+         * now DRAW, with no desync at all. */
         put8(GX_OP_DRAW_FIRST | (GX_PRIM_TRIANGLES << 3) | 0u);
         put16(5000u);
         for (i = 0; i < 5000u * 4u; ++i) put32(0xFFFFFFFFu);
+        CHECK(gx.desyncs == desyncs);
+        CHECK(gx.triangles == tris + 1666u);
+        tris = gx.triangles;
+
+        /* Past 1 MiB the drop remains: a 36-byte vertex (pos+nrm f32,
+         * rgba8888, tex0 f32x2) at 40,000 vertices is 1.44 MB. */
+        gx.vcd_lo = (1u << 9) | (1u << 11) | (1u << 13);
+        gx.vcd_hi = 1u;                              /* TEX0 direct */
+        gx.vat_a[0] = (1u << 0) | (4u << 1)          /* pos f32 x3 */
+                    | (4u << 10)                     /* nrm f32 */
+                    | (1u << 13) | (5u << 14)        /* clr0 rgba8888 */
+                    | (1u << 21) | (4u << 22);       /* tex0 f32 x2 */
+        {
+            MgsGxVertexFormat f;
+            mgs_gx_vertex_format(&gx, 0, &f);
+            CHECK(mgs_gx_vertex_size(&f) == 36u);
+        }
+        put8(GX_OP_DRAW_FIRST | (GX_PRIM_TRIANGLES << 3) | 0u);
+        put16(40000u);
+        for (i = 0; i < 40000u * 9u; ++i) put32(0xFFFFFFFFu);
 
         /* Exactly one desync: the drop itself, counted as before. */
         CHECK(gx.desyncs == desyncs + 1u);
         CHECK(gx.triangles == tris);                 /* dropped, not drawn */
 
-        /* And the stream is still aligned: a following triangle parses. */
+        /* And the stream is still aligned: a following triangle in the
+         * restored 16-byte format parses. */
+        gx.vcd_lo = (1u << 9) | (1u << 13);
+        gx.vcd_hi = 0;
+        gx.vat_a[0] = (1u << 0) | (4u << 1) | (1u << 13) | (5u << 14);
         put8(GX_OP_DRAW_FIRST | (GX_PRIM_TRIANGLES << 3) | 0u);
         put16(3);
         for (i = 0; i < 3u; ++i) {
