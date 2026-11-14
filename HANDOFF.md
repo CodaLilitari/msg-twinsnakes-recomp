@@ -16379,3 +16379,54 @@ exactly one desync per dropped run; the geometry is still dropped
 `tests/test_gx.c` covers it with non-NOP filler — zero bytes would
 have hidden the cascade, as they did on the first attempt here.
 
+### F389 (fork, 2026-11-13) — the deterministic clock starves the controller; G3 probe status
+
+Scripted USA play (G3, Dock to cargo lift) resumed from probe 14. The
+idea was to make the open-loop pad scripts reproducible first
+(`MGS_GUEST_CLOCK=steps`), then tune the route. That clock cannot be
+used for scripted play at all, and the measurement is not subtle:
+
+    run                clock   SI (controller) MMIO reads
+    probe 13, 14       wall    1,798,464 / 1,240,372
+    probes 16A/B,17,20 steps   1 (each)
+
+On the step clock the guest never polls the serial interface, so no
+scripted or held button is ever consumed and every run loops in the
+title/attract sequence. The PAD SDK's init banner prints and the host
+sets the button words (`[pad]` log lines), so the loss is between PAD
+init and its first poll; the mechanism is NOT yet understood and is
+recorded here as an open host defect. Until it is found, scripted runs
+must use the default wall clock, and no headless result obtained under
+`MGS_GUEST_CLOCK=steps` says anything about input-driven behaviour.
+
+Two more harness facts established on the way:
+
+- Step clock + async GX is not frame-deterministic anyway: two
+  identical 3e9-step runs diverge at saved frame 6 (GX commands differ
+  ~0.6%), because the draw-done token is counted by the render thread
+  and PE-finish delivery follows its wall-clock progress.
+  `MGS_GX_SYNC=1` removes that path but costs ~12x (32 saved frames in
+  30 min), which makes full-gameplay determinism impractical today.
+- `MGS_SAVE_SEQ` writes at most 240 frames per run. Long probes must
+  place the window with `MGS_SAVE_FROM_COPY`/`MGS_SAVE_EVERY` or the
+  evidence stops before the gameplay does.
+
+Wall-clock timings are themselves phase-fragile, in both directions:
+probe 21 died because that run's arrival codec ran to about field
+37000, so the prone tap at 28500 fired inside the codec and the crawl
+legs executed standing; probe 22 (Dock segment shifted +14000 fields
+for margin) was spotted standing at the spawn (ALERT at saved frame
+70) and dead by frame 100 - with arrival earlier that run, the shift
+left Snake in the open for thousands of fields. Arrival time varies
+by more than a guard patrol cycle between runs, so no single absolute
+prone tap is safe. Open-loop scripts have reached their limit here;
+the next step for the playthrough programme is host-side feedback for
+the pad script (for example entries gated on a guest-memory condition
+such as the player state), not more timing guesses. Probe 22 was
+terminated once its outcome was established and the frame window was
+exhausted, so its log has no final counter summary.
+
+The 1 MiB GX staging raise (previous commit) holds up across every
+run in this series: title-to-Dock and full-length Dock runs alike
+report 0 GX desync and 0 unhandled host instructions.
+
