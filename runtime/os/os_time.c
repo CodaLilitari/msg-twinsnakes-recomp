@@ -59,7 +59,43 @@ void mgs_OSRestoreInterrupts(CPUState* ctx)
 
 void mgs_runtime_advance_ticks(MgsRuntime* rt, uint64_t ticks)
 {
-    if (rt) rt->ticks += ticks;
+    if (!rt) return;
+    rt->ticks += ticks;
+    if (rt->dec_armed && rt->ticks >= rt->dec_deadline) {
+        rt->dec_armed = 0;
+        rt->dec_pending = 1;
+    }
+}
+
+void mgs_runtime_set_decrementer(MgsRuntime* rt, uint32_t value)
+{
+    if (!rt) return;
+    rt->dec_last = value;
+    /* Writing 0 is how the SDK asks for the exception on the next tick
+     * (SetTimer's already-overdue case), and a countdown that is already
+     * at its deadline must not wait for one more advance that a wall-clock
+     * payout might not make this step. */
+    rt->dec_deadline = rt->ticks + (uint64_t)value;
+    rt->dec_armed = value != 0u;
+    rt->dec_pending = value == 0u;
+}
+
+uint32_t mgs_runtime_get_decrementer(const MgsRuntime* rt)
+{
+    if (!rt) return 0u;
+    if (rt->dec_armed || rt->dec_pending)
+        return (uint32_t)((int64_t)rt->dec_deadline - (int64_t)rt->ticks);
+    return rt->dec_last;
+}
+
+int mgs_runtime_decrementer_pending(const MgsRuntime* rt)
+{
+    return rt != NULL && rt->dec_pending;
+}
+
+void mgs_runtime_decrementer_taken(MgsRuntime* rt)
+{
+    if (rt) rt->dec_pending = 0;
 }
 
 uint64_t mgs_runtime_ticks(const MgsRuntime* rt)

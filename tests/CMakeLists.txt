@@ -43,6 +43,14 @@ add_executable(test_vi_ticks test_vi_ticks.c)
 target_link_libraries(test_vi_ticks PRIVATE mgs_runtime)
 add_test(NAME vi_ticks COMMAND test_vi_ticks)
 
+add_executable(test_decrementer test_decrementer.c)
+target_link_libraries(test_decrementer PRIVATE mgs_runtime)
+add_test(NAME decrementer COMMAND test_decrementer)
+
+add_executable(test_di test_di.c)
+target_link_libraries(test_di PRIVATE mgs_runtime)
+add_test(NAME di COMMAND test_di)
+
 add_executable(test_pad test_pad.c)
 target_link_libraries(test_pad PRIVATE mgs_runtime m)
 add_test(NAME pad COMMAND test_pad)

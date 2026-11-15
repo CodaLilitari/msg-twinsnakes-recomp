@@ -200,6 +200,9 @@ unsigned long mgs_host_spr_unknown(void);
 /* Interrupt delivery. The host raises a cause and calls the guest's own
  * dispatcher; it does not reimplement the SDK's handling. */
 void     mgs_interrupt_set_dispatch(uint32_t guest_address);
+void     mgs_interrupt_set_decrementer(uint32_t guest_address);
+int      mgs_interrupt_decrementer(const MgsModule* mod, void* cpu);
+uint64_t mgs_interrupt_decrementer_sent(void);
 int      mgs_interrupt_raise(const MgsModule* mod, void* cpu, uint32_t cause_bit);
 int      mgs_interrupt_vi(const MgsModule* mod, void* cpu);
 int      mgs_interrupt_dsp(const MgsModule* mod, void* cpu);

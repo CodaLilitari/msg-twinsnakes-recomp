@@ -30,6 +30,21 @@ typedef struct MgsRuntime {
      */
     uint64_t ticks;
 
+    /* The processor decrementer, as a deadline in ticks. The guest writes
+     * DEC (PPCMtdec) with a countdown; hardware decrements it at the
+     * timebase rate and raises the decrementer exception when it crosses
+     * zero, which is how SDK OSAlarms fire. Nothing counted the shadow
+     * register down here, so no alarm ever fired in either guest clock
+     * mode - invisible while the wall clock made SIInit's 65 us transfer
+     * delay already expired at first call, fatal on the step clock where
+     * SIInit runs inside that first 65 us and its controller probe waits
+     * on the alarm for ever (F389). dec_last is the last value the guest
+     * wrote, for reads while no countdown is live. */
+    uint64_t dec_deadline;
+    uint32_t dec_last;
+    int      dec_armed;
+    int      dec_pending;
+
     /* "Interrupts disabled" is NOT a flag of our own. It is MSR[EE], the
      * processor bit the real OSDisableInterrupts clears with mtmsr, and the
      * host reads that same bit to decide whether an interrupt may be
@@ -80,5 +95,14 @@ void mgs_runtime_set_current(MgsRuntime* rt);
  * clock so a replayed run is reproducible. */
 void mgs_runtime_advance_ticks(MgsRuntime* rt, uint64_t ticks);
 uint64_t mgs_runtime_ticks(const MgsRuntime* rt);
+
+/* The decrementer (SPR 22). Set rearms; guest time reaching the deadline
+ * makes it pending, and the run loop delivers the guest's decrementer
+ * exception and calls taken. Reading it answers what the hardware would:
+ * the ticks left, wrapping negative once overdue. */
+void     mgs_runtime_set_decrementer(MgsRuntime* rt, uint32_t value);
+uint32_t mgs_runtime_get_decrementer(const MgsRuntime* rt);
+int      mgs_runtime_decrementer_pending(const MgsRuntime* rt);
+void     mgs_runtime_decrementer_taken(MgsRuntime* rt);
 
 #endif

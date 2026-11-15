@@ -1972,6 +1972,16 @@ MgsRunResult mgs_module_run(const MgsModule* mod, void* cpu, uint64_t max_steps)
         if ((gt >= due_pend ? (due_pend = gt + 1688ull, 1) : 0))
             mgs_interrupt_pending(mod, cpu);
 
+        /* The decrementer, on the same offer cadence: expiry was decided
+         * when guest time advanced (mgs_runtime_advance_ticks), and an
+         * expired decrementer stays pending until EE lets it in, so this
+         * is an offer, not an event. Without it no OSAlarm ever fires -
+         * which was invisible until a guest clock let SIInit queue its
+         * first controller probe behind one (F389/F390). */
+        if (mgs_runtime_decrementer_pending(rt) &&
+            mgs_interrupt_decrementer(mod, cpu))
+            mgs_runtime_decrementer_taken(rt);
+
         /* Far more often than a task: a transfer finishes as soon as it is
          * started here, and the audio manager waits on each one. */
         if ((gt >= due_aram ? (due_aram = gt + 1016ull, 1) : 0))

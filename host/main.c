@@ -905,6 +905,7 @@ static MgsSdkFn (*s_patch_lookup)(uint32_t) = mgs_patch_lookup;
 static uint32_t s_patch_lo = MGS_PATCH_LO;
 static uint32_t s_patch_span = MGS_PATCH_SPAN;
 static uint32_t s_dispatch_addr = 0x800201A4u; /* GGSPA4 __OSDispatchInterrupt */
+static uint32_t s_dec_addr = 0x8001C874u;      /* GGSPA4 DecrementerExceptionHandler */
 static uint32_t s_oslink_addr = 0x80020AD8u;   /* GGSPA4 OSLink */
 static uint32_t s_os_disable = 0x8001FCCCu;   /* GGSPA4 OSDisableInterrupts */
 static uint32_t s_os_restore = 0x8001FCF4u;   /* GGSPA4 OSRestoreInterrupts */
@@ -922,6 +923,7 @@ static void patch_select(const char* game_id)
         s_patch_lo = MGS_PATCH_LO_USA;
         s_patch_span = MGS_PATCH_SPAN_USA;
         s_dispatch_addr = 0x80020B58u;
+        s_dec_addr = 0x8001D228u;      /* GGSEA4 DecrementerExceptionHandler */
         s_oslink_addr = 0x8002148Cu;
         s_os_disable = 0x80020680u;
         s_os_restore = 0x800206A8u;
@@ -2210,6 +2212,7 @@ int main(int argc, char** argv)
                         MgsSdkFn probe = s_patch_lookup(s_patch_lo);
                         (void)probe;
                         mgs_interrupt_set_dispatch(s_dispatch_addr);  /* __OSDispatchInterrupt */
+                        mgs_interrupt_set_decrementer(s_dec_addr);    /* DecrementerExceptionHandler */
                         {   void mgs_interrupt_set_dsp_curr_task(uint32_t);
                             mgs_interrupt_set_dsp_curr_task(s_dsp_curr_task); }
                         /* OSLink(module, bss). The bss pointer is the base
@@ -3660,6 +3663,8 @@ int main(int argc, char** argv)
                                (unsigned long long)mgs_interrupt_delivered(),
                                (unsigned long long)mgs_interrupt_refused(),
                                (unsigned long long)mgs_interrupt_failed());
+                        printf("decrementer exceptions delivered: %llu\n",
+                               (unsigned long long)mgs_interrupt_decrementer_sent());
                         /* WHAT IS STILL PENDING WHEN WE STOP.
                          *
                          * A handler acknowledges its source by writing the

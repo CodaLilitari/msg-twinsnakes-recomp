@@ -16430,3 +16430,63 @@ The 1 MiB GX staging raise (previous commit) holds up across every
 run in this series: title-to-Dock and full-length Dock runs alike
 report 0 GX desync and 0 unhandled host instructions.
 
+### F390 (fork, 2026-11-14) — the decrementer exists; OSAlarms fire; the step clock takes input again
+
+F389's open defect is closed. The mechanism, end to end:
+
+SIInit ends by probing all four channels with SIGetType, which calls
+SITransfer with a 65 us delay. SITransfer compares that delay against
+the last transfer time (zero at boot): if system time is already past
+65 us it transfers at once, otherwise it QUEUES the packet behind an
+OSSetAlarm. On the wall clock, real boot time is always past 65 us, so
+the immediate path was always taken. On the step clock, SIInit runs
+inside the first 65 us of guest time, the probes queued - and nothing
+in the host ever counted the PPC decrementer down, so the alarm never
+fired, no channel was ever probed, and no controller input was ever
+consumed. One SI register read per run, exactly as measured.
+
+The discriminators that pinned it: tick rate 1 and forced-retrace
+runs stay at 1 read; tick rate 64 (guest time at SIInit already past
+the 65 us deadline) gives 500,282. Wall clock at MGS_SPEED=8 is
+unaffected. Stacks at the SI registers (temporary host
+instrumentation, since reverted) showed SIInit returning right after
+the queued probes, with all later SI_POLL writes coming from the
+sampling refresh in the VI retrace handler.
+
+The host now models the decrementer the way the hardware presents
+it: a guest-written countdown against guest time (`MgsRuntime` dec
+fields, `runtime/os/os_time.c`), SPR 22 reads answering with the time
+left, and expiry delivered as exception 8 into the guest's own
+DecrementerExceptionHandler through the same take-exception
+transition the external interrupt uses (`host/interrupt.c`, offered
+from the run loop while pending). This is not step-clock special
+casing: alarms were dead on every clock, and anything else that arms
+one (DVD timeouts are the visible candidate) has the same latent
+hole now closed. `tests/test_decrementer.c` pins the countdown state
+machine.
+
+One knock-on had to be modelled before any of this could run: with
+alarms live, DVDLow's ten-second timeout fired on the boot Inquiry
+command, which pends for ever in a DI block that was plain memory.
+DI commands now complete the way EXI's do - DMA payload first (a
+drive-info block for Inquiry; DVDLow consumes none of it, other DMA
+reads deliver zeroes as a stated limit), then TCINT - with the PI DI
+line level-triggered from the status bits and the guest's
+write-intr|mask acknowledgement clearing it. `tests/test_di.c` pins
+that contract. Before that part landed, both clocks died at the same
+frame of the opening in the SDK's fatal-error loop.
+
+Measured after the fix: step clock, 6e8 steps, SI reads 1 -> 5,863
+with 5 decrementer exceptions delivered; the probe 18 script (menu
+spam, codec taps, prone at spawn) now drives the step-clock build
+through the menus to a living Snake standing in the Dock at the step
+limit - 511,758 SI reads, 0 GX desync - where before it never left
+the attract loop. Wall clock re-verified on the same tree (frames
+advancing well past the timeout point, decrementer exceptions now
+delivered and survived). Full suite 28/28.
+
+What this does NOT fix: step clock + async GX is still not
+frame-deterministic (F389), and arrival phase still varies between
+runs on either clock; scripted Dock crossings remain fragile for the
+reasons F389 records, and pad-script feedback is still the way out.
+

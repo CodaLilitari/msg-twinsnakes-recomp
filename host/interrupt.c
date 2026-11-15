@@ -59,8 +59,10 @@
 
 /* From the SDK's OSException.h. */
 #define OS_EXCEPTION_EXTERNAL_INTERRUPT 4u
+#define OS_EXCEPTION_DECREMENTER        8u
 
 static uint32_t s_dispatch_addr;      /* guest __OSDispatchInterrupt */
+static uint32_t s_dec_addr;           /* guest DecrementerExceptionHandler */
 static uint64_t s_delivered, s_refused, s_failed;
 
 void mgs_interrupt_set_dispatch(uint32_t guest_address);
@@ -226,6 +228,44 @@ int mgs_interrupt_pending(const MgsModule* mod, void* cpu)
 
     ++s_delivered;
     ++s_redelivered;
+    return 1;
+}
+
+void mgs_interrupt_set_decrementer(uint32_t guest_address);
+void mgs_interrupt_set_decrementer(uint32_t guest_address) { s_dec_addr = guest_address; }
+
+static uint64_t s_dec_sent;
+uint64_t mgs_interrupt_decrementer_sent(void);
+uint64_t mgs_interrupt_decrementer_sent(void) { return s_dec_sent; }
+
+/* Deliver the decrementer exception the run loop has pending.
+ *
+ * The caller owns the pending flag and clears it only on a 1 here. A
+ * decrementer exception is not a PI source: no cause or mask bit of the
+ * interrupt controller's is involved, so the only gate is MSR[EE],
+ * exactly as on hardware, where an expired decrementer stays pending
+ * while EE is clear and is taken the moment it returns. Entering the
+ * guest's DecrementerExceptionHandler directly is the same state
+ * transition the exception-vector stub completes - spill the context,
+ * r3 = exception, r4 = context - which mgs_module_take_exception is. */
+int mgs_interrupt_decrementer(const MgsModule* mod, void* cpu);
+int mgs_interrupt_decrementer(const MgsModule* mod, void* cpu)
+{
+    (void)mod;
+    if (!s_dec_addr) return 0;
+    if (!(mgs_module_msr(cpu) & 0x8000u)) {
+        ++s_refused;
+        if (s_ee_exit_flag) *s_ee_exit_flag = 1u;
+        return 0;
+    }
+    if (!mgs_module_take_exception(cpu, s_dec_addr,
+                                   OS_EXCEPTION_DECREMENTER)) {
+        ++s_failed;
+        return 0;
+    }
+    ++s_delivered;
+    ++s_dec_sent;
+    if (s_ee_exit_flag) *s_ee_exit_flag = 0u;
     return 1;
 }
 

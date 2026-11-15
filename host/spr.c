@@ -17,6 +17,7 @@
  * call came from.
  */
 #include "module.h"
+#include "os/os_runtime.h"
 #include "platform/mmio.h"
 
 #include <stdio.h>
@@ -25,6 +26,7 @@
 #include <stdbool.h>
 
 /* Gekko SPR numbers. */
+#define SPR_DEC    22
 #define SPR_LR     8
 #define SPR_CTR    9
 #define SPR_GQR0 912
@@ -141,12 +143,19 @@ static void host_instruction_fallback(void* cpu, uint32_t insn, uint32_t cia)
     uint32_t* gpr   = gpr_of(cpu);
 
     if (opcode == 31u && xo == 339u) {          /* mfspr rD, SPR */
-        gpr[rd] = spr_is_mirrored(spr) ? spr_read_mirror(cpu, spr) : s_spr[spr];
+        /* The decrementer is LIVE, not remembered: it counts down with
+         * guest time in the runtime, and a read must answer with the time
+         * left, not with the value last written. */
+        gpr[rd] = spr == SPR_DEC
+                      ? mgs_runtime_get_decrementer(mgs_runtime_from(cpu))
+                      : spr_is_mirrored(spr) ? spr_read_mirror(cpu, spr) : s_spr[spr];
         ++s_handled; complete(cpu, cia);
         return;
     }
     if (opcode == 31u && xo == 467u) {          /* mtspr SPR, rS */
         s_spr[spr] = gpr[rd];
+        if (spr == SPR_DEC)
+            mgs_runtime_set_decrementer(mgs_runtime_from(cpu), gpr[rd]);
         spr_mirror(cpu, spr, gpr[rd]);
         ++s_handled; complete(cpu, cia);
         return;
@@ -397,6 +406,8 @@ static uint32_t host_spr_read(void* cpu, uint16_t spr, uint32_t cia)
 {
     (void)cia;
     ++s_handled;
+    if (spr == SPR_DEC)
+        return mgs_runtime_get_decrementer(mgs_runtime_from(cpu));
     return spr_is_mirrored(spr) ? spr_read_mirror(cpu, spr) : s_spr[spr & 1023u];
 }
 
@@ -405,6 +416,8 @@ static void host_spr_write(void* cpu, uint16_t spr, uint32_t value, uint32_t cia
     (void)cia;
     ++s_handled;
     s_spr[spr & 1023u] = value;
+    if (spr == SPR_DEC)
+        mgs_runtime_set_decrementer(mgs_runtime_from(cpu), value);
     spr_mirror(cpu, spr, value);
 }
 

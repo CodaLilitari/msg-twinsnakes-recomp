@@ -124,6 +124,82 @@ unsigned mgs_mmio_vi_field_rate(const MgsMmio* m)
 static uint32_t pi_cause(const MgsMmio* m);
 static void     pi_set_cause(MgsMmio* m, uint32_t cause);
 
+/* The disc interface, for the guest's own DVDLow layer.
+ *
+ * File reads never reach it here - the DVD entry points above DVDLow are
+ * shimmed - but DVDInit still issues one low command of its own (drive
+ * Inquiry) and arms DVDLow's ten-second timeout alarm against it. With
+ * no model at all the command pended for ever, which was invisible
+ * while OSAlarms themselves never fired (F389) and is a fatal drive
+ * error ten guest-seconds into every run now that they do (F390). So
+ * commands complete the way EXI's do: at once, with a transfer-complete
+ * interrupt, and a DMA read delivers its bytes before that interrupt.
+ * Only Inquiry's payload is modelled (a drive-info block); other DMA
+ * reads deliver zeroes, which is a stated limit, not data - a guest
+ * that starts reading the disc through DVDLow instead of the shims
+ * will need the real thing. */
+#define DI_SR              0x00u   /* status: intr bits 0x54, masks 0x2A */
+#define DI_CVR             0x04u   /* cover: intr bit 0x04, mask 0x02 */
+#define DI_CMDBUF0         0x08u
+#define DI_MAR             0x14u
+#define DI_LENGTH          0x18u
+#define DI_CR              0x1Cu   /* bit 0 = TSTART, bit 1 = DMA */
+#define DI_TSTART          0x01u
+#define DI_DMA             0x02u
+#define DI_SR_INTR         0x54u
+#define DI_SR_MASK         0x2Au
+#define DI_TCINT           0x10u
+#define PI_DI              (1u << 2)
+
+static uint32_t di_reg(const MgsMmio* m, uint32_t off)
+{
+    const uint8_t* p = &m->regs[(MMIO_DI - MMIO_BASE) + off];
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+static void di_set_reg(MgsMmio* m, uint32_t off, uint32_t v)
+{
+    uint8_t* p = &m->regs[(MMIO_DI - MMIO_BASE) + off];
+    p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16);
+    p[2] = (uint8_t)(v >> 8);  p[3] = (uint8_t)v;
+}
+
+static void di_refresh_line(MgsMmio* m)
+{
+    uint32_t sr = di_reg(m, DI_SR);
+    uint32_t cvr = di_reg(m, DI_CVR);
+    uint32_t cause = pi_cause(m);
+    int asserted = ((sr & DI_SR_INTR) & ((sr & DI_SR_MASK) << 1)) ||
+                   ((cvr & 0x04u) & ((cvr & 0x02u) << 1));
+
+    if (asserted) pi_set_cause(m, cause | PI_DI);
+    else          pi_set_cause(m, cause & ~PI_DI);
+}
+
+static void di_execute(MgsMmio* m, uint32_t cr)
+{
+    uint32_t cmd = di_reg(m, DI_CMDBUF0);
+
+    if ((cr & DI_DMA) && m->exi_mem) {
+        uint32_t mar = di_reg(m, DI_MAR);
+        uint32_t len = di_reg(m, DI_LENGTH);
+        uint32_t i;
+        if (len > 0x200000u) len = 0x200000u;
+        for (i = 0u; i < len; ++i) guest_write8(m->exi_mem, mar + i, 0u);
+        if ((cmd >> 24) == 0x12u && len >= 8u) {
+            /* DVDDriveInfo: revision level, device code, release date.
+             * DVDLow itself consumes none of it; the completion is the
+             * contract the timeout alarm exists to enforce. */
+            guest_write32(m->exi_mem, mar, 0x02020D15u);
+            guest_write32(m->exi_mem, mar + 4u, 0x20030207u);
+        }
+        di_set_reg(m, DI_LENGTH, 0u);
+    }
+    di_set_reg(m, DI_SR, di_reg(m, DI_SR) | DI_TCINT);
+    di_refresh_line(m);
+}
+
 /* CLEARING THE START BIT IS NOT HOW A TRANSFER FINISHES.
  *
  * The lesson the serial interface already cost us (F153). Hardware also
@@ -1165,6 +1241,34 @@ void mgs_mmio_write(MgsMmio* m, uint32_t addr, uint32_t value, unsigned size)
                  * before the load was validated, so the comparison was
                  * worthless: the image was failing the boot, not the
                  * interrupt. Retried against a validated card. */
+            }
+        }
+
+        /* Disc interface: same completion contract as EXI above. The
+         * status interrupt bits are write-one-to-clear (the DVDLow
+         * handler acknowledges by writing intr|mask back), so a plain
+         * store has to be undone for them before the line is refreshed. */
+        if (off >= MMIO_DI - MMIO_BASE && off < MMIO_DI - MMIO_BASE + 0x20u) {
+            uint32_t within = off - (MMIO_DI - MMIO_BASE);
+            if (within == DI_SR) {
+                uint32_t cur = di_reg(m, DI_SR);
+                uint32_t v = (cur & ~DI_SR_INTR) |
+                             (cur & DI_SR_INTR & ~value);
+                v = (v & ~DI_SR_MASK) | (value & DI_SR_MASK);
+                v |= value & ~(DI_SR_INTR | DI_SR_MASK);
+                di_set_reg(m, DI_SR, v);
+                di_refresh_line(m);
+            }
+            if (within == DI_CVR) {
+                uint32_t cur = di_reg(m, DI_CVR);
+                uint32_t v = (cur & ~0x04u) | (cur & 0x04u & ~value);
+                v = (v & ~0x02u) | (value & 0x02u);
+                di_set_reg(m, DI_CVR, v);
+                di_refresh_line(m);
+            }
+            if (within == DI_CR && (value & DI_TSTART)) {
+                di_execute(m, value);
+                m->regs[off + size - 1u] &= (uint8_t)~DI_TSTART;
             }
         }
 
