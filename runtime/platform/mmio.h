@@ -176,8 +176,19 @@ typedef struct MgsMmio {
     uint16_t pad_script_btn[MGS_PAD_SCRIPT_MAX];
     uint8_t  pad_script_sx[MGS_PAD_SCRIPT_MAX];   /* optional :sx:sy (hex) */
     uint8_t  pad_script_sy[MGS_PAD_SCRIPT_MAX];
+    /* Gate entries ("G<count>:..." in the script) end a segment: the
+     * entries after one are timed from when the host counter the gate
+     * names (completed disc reads) reaches its count, not from boot.
+     * Menus and codecs consume variable fields even on a deterministic
+     * guest clock, so a phase that must begin AT a game event - level
+     * select open, player control at the Dock - is anchored to the read
+     * that loads it instead of to an absolute field that drifts. For a
+     * gate entry pad_script_frame holds the read count. */
+    uint8_t  pad_script_gate[MGS_PAD_SCRIPT_MAX];
     unsigned pad_script_n;
-    uint32_t pad_frame;
+    unsigned pad_seg_base;   /* first entry of the current segment */
+    uint32_t pad_frame;      /* fields since the segment began */
+    uint64_t (*pad_gate_fn)(void);
     uint16_t pad_reported;
 
 } MgsMmio;
@@ -190,6 +201,9 @@ void     mgs_mmio_write(MgsMmio* m, uint32_t addr, uint32_t value, unsigned size
  * real time rather than with how fast the guest spins. */
 void     mgs_mmio_tick_frame(MgsMmio* m);
 void     mgs_mmio_set_pad(MgsMmio* m, uint16_t buttons);
+/* The counter pad-script gates wait on (completed disc reads in the
+ * host). Unset, gates release as soon as their segment's timing ends. */
+void     mgs_mmio_set_pad_gate(MgsMmio* m, uint64_t (*fn)(void));
 /* Sticks and triggers, raw SI bytes (0x80 = centre). */
 void     mgs_mmio_set_pad_analog(MgsMmio* m, uint8_t sx, uint8_t sy,
                                  uint8_t cx, uint8_t cy,

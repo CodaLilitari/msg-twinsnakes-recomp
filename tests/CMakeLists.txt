@@ -51,6 +51,10 @@ add_executable(test_di test_di.c)
 target_link_libraries(test_di PRIVATE mgs_runtime)
 add_test(NAME di COMMAND test_di)
 
+add_executable(test_pad_gate test_pad_gate.c)
+target_link_libraries(test_pad_gate PRIVATE mgs_runtime)
+add_test(NAME pad_gate COMMAND test_pad_gate)
+
 add_executable(test_pad test_pad.c)
 target_link_libraries(test_pad PRIVATE mgs_runtime m)
 add_test(NAME pad COMMAND test_pad)

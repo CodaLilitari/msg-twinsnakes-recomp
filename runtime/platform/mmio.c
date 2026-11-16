@@ -448,15 +448,24 @@ void mgs_mmio_init(MgsMmio* m)
         /* MGS_PAD_SCRIPT="frame:hex,frame:hex,..." holds each button word
          * from that frame onward, so a run can drive itself through a menu
          * without a human at the keyboard. Reaching the video needs Down
-         * then A, which a single held word cannot express. */
+         * then A, which a single held word cannot express.
+         *
+         * An entry whose frame is G<count> is a gate: it ends the
+         * segment, and frames after it count from when the host's gate
+         * counter (completed disc reads) reaches <count>. The button
+         * word on a gate is parsed for uniformity and not used. */
         {
             const char* q = getenv("MGS_PAD_SCRIPT");
             m->pad_script_n = 0u;
             while (q && *q && m->pad_script_n < MGS_PAD_SCRIPT_MAX) {
                 char* end;
-                unsigned long fr = strtoul(q, &end, 0);
+                int gate = (*q == 'G' || *q == 'g');
+                unsigned long fr;
+                if (gate) ++q;
+                fr = strtoul(q, &end, 0);
                 if (end == q || *end != ':') break;
                 q = end + 1;
+                m->pad_script_gate[m->pad_script_n] = (uint8_t)gate;
                 m->pad_script_frame[m->pad_script_n] = (uint32_t)fr;
                 m->pad_script_btn[m->pad_script_n] =
                     (uint16_t)strtoul(q, &end, 16);
@@ -1372,6 +1381,11 @@ void mgs_mmio_write(MgsMmio* m, uint32_t addr, uint32_t value, unsigned size)
 
 /* What the controller in port 1 is holding down. Set from the host's input
  * layer once a frame; read by si_reply when the port is polled. */
+void mgs_mmio_set_pad_gate(MgsMmio* m, uint64_t (*fn)(void))
+{
+    if (m) m->pad_gate_fn = fn;
+}
+
 void mgs_mmio_set_pad(MgsMmio* m, uint16_t buttons)
 {
     if (!m) return;
@@ -1398,12 +1412,38 @@ void mgs_mmio_tick_frame(MgsMmio* m)
 {
     ++m->field_count;
     /* The scripted pad, if one was given: the last entry whose frame has
-     * arrived wins, so entries are held rather than pulsed. */
+     * arrived wins, so entries are held rather than pulsed.
+     *
+     * A gate entry ends the segment: once the segment's own timing has
+     * run out AND the gate counter has reached the gate's count, the
+     * frame clock re-bases at 0 for the entries after it. Until then
+     * the segment's last entry simply stays held (every timed segment
+     * ends in a release, so that is the neutral it reads as). Entries
+     * must be in frame order within a segment; the scan below assumes
+     * it only in that a later entry supersedes an earlier one, which
+     * the old whole-script scan also assumed. */
     if (m->pad_script_n) {
-        unsigned i;
+        unsigned i, gate = m->pad_script_n;
+        uint32_t seg_end = 0u;
         uint16_t held = 0u;
         uint8_t held_sx = 0x80u, held_sy = 0x80u;
-        for (i = 0; i < m->pad_script_n; ++i)
+
+        for (i = m->pad_seg_base; i < m->pad_script_n; ++i) {
+            if (m->pad_script_gate[i]) { gate = i; break; }
+            if (m->pad_script_frame[i] > seg_end)
+                seg_end = m->pad_script_frame[i];
+        }
+        if (gate < m->pad_script_n && m->pad_frame > seg_end) {
+            uint64_t count = m->pad_gate_fn ? m->pad_gate_fn() : ~0ull;
+            if (count >= (uint64_t)m->pad_script_frame[gate]) {
+                m->pad_seg_base = gate + 1u;
+                m->pad_frame = 0u;
+                gate = m->pad_script_n;
+                for (i = m->pad_seg_base; i < m->pad_script_n; ++i)
+                    if (m->pad_script_gate[i]) { gate = i; break; }
+            }
+        }
+        for (i = m->pad_seg_base; i < gate; ++i)
             if (m->pad_frame >= m->pad_script_frame[i]) {
                 held = m->pad_script_btn[i];
                 held_sx = m->pad_script_sx[i];

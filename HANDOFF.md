@@ -16490,3 +16490,39 @@ frame-deterministic (F389), and arrival phase still varies between
 runs on either clock; scripted Dock crossings remain fragile for the
 reasons F389 records, and pad-script feedback is still the way out.
 
+### F391 (fork, 2026-11-15) — pad-script gates; probe 44 passes the alley guard, then wedges
+
+`MGS_PAD_SCRIPT` entries can now be gates: `G<count>:...` ends a
+segment, and following entries are timed from when the host counter
+the gate names - completed disc reads, registered in main from
+`mgs_dvd_completed` - reaches the count. Disc reads are issued in
+game-flow order, so the count at an event is stable run to run even
+when its field is not; that is the anchor absolute field timings
+lacked (probes 21/22 died opposite ways to arrival phase). The
+segment before a gate keeps its boot timing, the gate releases once
+that timing has run out AND the count is met, and with no counter
+registered a gate degrades to segment timing alone so scripts never
+hang in a build without one. `tests/test_pad_gate.c` pins it; the
+existing pad tests are unchanged in behaviour (no gates = the old
+whole-script scan).
+
+Measured landmarks on the step clock (heartbeat frames/reads, then
+saved frames): the Dock stage-load burst ends at 1067 completed
+reads; menus are done by a few hundred. Probe 43 gated its route
+there (G1060), crouched on schedule - the anchor works - and died
+to the alley guard anyway. Probe 44 delayed the legs +6000 segment
+fields and passed him: alive at the alley's north end in frame 107.
+It then wedges somewhere past XFB copy 52376 - copies stop, GX
+commands keep climbing, the engine thread spins in REL code with
+MSR[EE] off and interrupts refused thereafter (63M by step limit).
+Un-diagnosed; it is the next defect on the G3 path, and it did not
+happen in the ungated runs that died earlier, so whether it is new
+territory or new breakage is open.
+
+Also settled by probes 36-38, for whoever scripts next: X is a
+crouch toggle (press = crouch and stay, press again = stand; no
+prone posture is reached by hold or double-tap - the "crawl" legs
+of every probe so far were crouch-walks, which do pass under the
+containers), and copies on the step clock run ~1.0 per field, so a
+save window's copy range is its field range near enough.
+

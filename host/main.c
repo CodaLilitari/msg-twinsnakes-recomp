@@ -2213,6 +2213,9 @@ int main(int argc, char** argv)
                         (void)probe;
                         mgs_interrupt_set_dispatch(s_dispatch_addr);  /* __OSDispatchInterrupt */
                         mgs_interrupt_set_decrementer(s_dec_addr);    /* DecrementerExceptionHandler */
+                        /* Pad-script gates wait on completed disc reads:
+                         * the counter a script segment is anchored to. */
+                        mgs_mmio_set_pad_gate(mgs_host_mmio(), mgs_dvd_completed);
                         {   void mgs_interrupt_set_dsp_curr_task(uint32_t);
                             mgs_interrupt_set_dsp_curr_task(s_dsp_curr_task); }
                         /* OSLink(module, bss). The bss pointer is the base
