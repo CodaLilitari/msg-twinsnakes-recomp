@@ -84,6 +84,34 @@ uint64_t mgs_interrupt_failed(void) { return s_failed; }
  */
 /* See mgs_interrupt_set_ee_flag. */
 static uint32_t* s_ee_exit_flag;
+/* The cause most recently refused for EE alone. The run loop re-raises
+ * exactly this one at the EE edge (module.c), so a refusal costs one
+ * extra delivery, not a re-offer of every armed source. */
+static uint32_t s_refused_cause;
+
+uint32_t mgs_interrupt_refused_cause(void);
+uint32_t mgs_interrupt_refused_cause(void) { return s_refused_cause; }
+
+/* Deliver the one cause whose EE refusal is outstanding. PE finish
+ * goes through its own offer again, because the token was put back
+ * when the first offer was refused and must be taken anew - raising
+ * the cause directly would signal a draw-done whose token is still
+ * counted, and the next offer would deliver it a second time. */
+int mgs_interrupt_pe_finish(const MgsModule* mod, void* cpu);
+int mgs_interrupt_deliver_refused(const MgsModule* mod, void* cpu);
+int mgs_interrupt_deliver_refused(const MgsModule* mod, void* cpu)
+{
+    if (!s_refused_cause) return 0;
+    if (s_refused_cause == PI_CAUSE_PE_FINISH)
+        return mgs_interrupt_pe_finish(mod, cpu);
+    return mgs_interrupt_raise(mod, cpu, s_refused_cause);
+}
+
+int mgs_interrupt_ee_exit_pending(void);
+int mgs_interrupt_ee_exit_pending(void)
+{
+    return s_ee_exit_flag != NULL && *s_ee_exit_flag != 0u;
+}
 
 int mgs_interrupt_raise(const MgsModule* mod, void* cpu, uint32_t cause_bit)
 {
@@ -105,6 +133,7 @@ int mgs_interrupt_raise(const MgsModule* mod, void* cpu, uint32_t cause_bit)
      * guest has armed. */
     if (!(mgs_module_msr(cpu) & 0x8000u)) {
         ++s_refused;
+        s_refused_cause = cause_bit;
         /* Native code re-enabling EE will now leave for the run loop, so
          * this is taken as soon as the guest can take it. */
         if (s_ee_exit_flag) *s_ee_exit_flag = 1u;
@@ -163,6 +192,7 @@ int mgs_interrupt_raise(const MgsModule* mod, void* cpu, uint32_t cause_bit)
     }
 
     ++s_delivered;
+    s_refused_cause = 0u;
     if (s_ee_exit_flag) *s_ee_exit_flag = 0u;
     return 1;
 }
@@ -228,6 +258,8 @@ int mgs_interrupt_pending(const MgsModule* mod, void* cpu)
 
     ++s_delivered;
     ++s_redelivered;
+    s_refused_cause = 0u;
+    if (s_ee_exit_flag) *s_ee_exit_flag = 0u;
     return 1;
 }
 

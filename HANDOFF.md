@@ -16526,3 +16526,44 @@ of every probe so far were crouch-walks, which do pass under the
 containers), and copies on the step clock run ~1.0 per field, so a
 save window's copy range is its field range near enough.
 
+### F392 (fork, 2026-11-16) — EE turning on is a deadline too: the step-clock draw-done wedge
+
+Probe 44's wedge (F391) is diagnosed and fixed. Symptom, async GX
+on the step clock only: XFB copies stop (52376 in probe 44, 4255 in
+the traced repro - the point varies, it is a race), GX commands keep
+climbing, the GX thread sleeps on its draw-done semaphore for ever,
+and every later interrupt offer is refused for MSR[EE] (63M by step
+limit). The wall clock and GX_SYNC both pass the same points.
+
+Mechanism: interrupt hooks are evaluated when guest time reaches
+the earliest hook deadline. On the wall clock guest time advances
+in real time while the guest executes, so a deadline lands inside
+whatever EE window is open when it passes. On the step clock guest
+time advances a fixed slice per dispatch, and the idle thread's
+EE-on window (restore, a few instructions, disable again) can open
+and close entirely between two evaluations, at the same phase
+every time: the draw-done token is offered, refused for EE, and
+offered again a deadline later in the same EE-off phase, for ever.
+The native EE-exit flag already cut the dispatch short at the EE
+0->1 transition; the run loop simply never acted on that exit
+before dispatching again.
+
+Fix: when EE is on and a delivery is actually outstanding - an
+interrupt whose refusal for EE is recorded, or the decrementer
+expired - the hooks block runs ahead of its deadline, and exactly
+the refused cause is re-raised (PE finish through its own offer,
+so the put-back token is taken anew rather than signalled twice).
+Two broader shapes were tried and measured first, both storms:
+opening the block on any armed PI cause or waiting token (level
+tests - DSP status and parser-ahead tokens are level-true for
+fields at a time) took deliveries to ~200/field and starved boot;
+the refusal record is the edge that keeps this to one extra
+delivery per refusal. Measured on the rerun gated route: copies
+119,364 with draw-done delivered 119,362 (1:1, was frozen at
+52,376), 0 desync, Snake past the alley guard and died on the east
+leg - a gameplay death, with respawn working. Deliveries per field
+run higher than the wall clock's (~88 vs ~10 in these runs): the
+refusals the aliasing used to swallow are mostly audio-DMA offers
+the guest now actually services. That cost is reported, not hidden;
+if it ever bites, the due_aid cadence is the knob, not this edge.
+

@@ -1877,7 +1877,40 @@ MgsRunResult mgs_module_run(const MgsModule* mod, void* cpu, uint64_t max_steps)
          * compare. The hooks themselves are unchanged and still each test
          * their own deadline, so their order and their else-if between the
          * retrace and the PE finish are exactly as before. */
-        if (forced_retrace || gt >= next_due) {
+        /* EE TURNING ON IS ALSO A DEADLINE, and on the step clock it is
+         * the only one that matters for a waiting guest.
+         *
+         * The hooks below are evaluated when guest time reaches the
+         * earliest of their deadlines. That assumes a refused interrupt
+         * will still find EE on at some later evaluation - true on the
+         * wall clock, where guest time advances in real time while the
+         * guest executes, so a deadline lands inside whatever EE window
+         * is open when it passes. On the step clock guest time advances
+         * a fixed slice per dispatch, and the idle thread's EE-on
+         * window (restore, a few instructions, disable again) can open
+         * and close entirely between two evaluations, at the same phase
+         * every time: the draw-done token is offered, refused for EE,
+         * and offered again a deadline later in the same EE-off phase,
+         * for ever, while the GX thread sleeps on its semaphore and
+         * presentation stops. The native EE-exit flag already cuts the
+         * dispatch short at the EE 0->1 transition; what was missing
+         * is the run loop ACTING on that exit before dispatching
+         * again. So when EE is on and a refusal is outstanding (or
+         * the decrementer has expired), the block below runs now,
+         * ahead of its deadline. Deliberately no level tests here:
+         * a PI-cause or token-waiting test opens the block on every
+         * step - DSP status sits asserted for fields at a time, the
+         * parser is usually ahead - and the guest drowns in
+         * re-offered handlers before it boots. */
+        int ee_force = 0;
+        int ee_refused = 0;
+        if (!forced_retrace && gt < next_due &&
+            (mgs_module_msr(cpu) & MSR_EE)) {
+            ee_refused = mgs_interrupt_ee_exit_pending();
+            if (ee_refused || mgs_runtime_decrementer_pending(rt))
+                ee_force = 1;
+        }
+        if (forced_retrace || gt >= next_due || ee_force) {
         /* The audio interface's sample counter comes off the same clock,
          * because __AI_SRC_INIT times one against the other. */
 
@@ -1981,6 +2014,14 @@ MgsRunResult mgs_module_run(const MgsModule* mod, void* cpu, uint64_t max_steps)
         if (mgs_runtime_decrementer_pending(rt) &&
             mgs_interrupt_decrementer(mod, cpu))
             mgs_runtime_decrementer_taken(rt);
+
+        /* The one delivery the EE edge was for: exactly the cause
+         * whose refusal is outstanding. Re-offering pending PI causes
+         * here instead would re-enter the dispatcher for level-held
+         * sources (DSP status sits asserted for fields at a time) on
+         * every EE window; this costs one delivery and only when a
+         * refusal actually happened. */
+        if (ee_refused) mgs_interrupt_deliver_refused(mod, cpu);
 
         /* Far more often than a task: a transfer finishes as soon as it is
          * started here, and the audio manager waits on each one. */
