@@ -16490,6 +16490,46 @@ frame-deterministic (F389), and arrival phase still varies between
 runs on either clock; scripted Dock crossings remain fragile for the
 reasons F389 records, and pad-script feedback is still the way out.
 
+### F393 (fork, 2026-11-16) — G3 route status after F390-F392; what the probes settled
+
+The gated route (F391) works as infrastructure: menu spam, a gate
+on the Dock stage-load read burst (ends at 1067 completed reads),
+then codec taps and the crawl legs timed from the gate. What it
+has not yet produced is the lift. The current state of evidence,
+all of it from saved frames:
+
+- Crouch is a toggle. One X press crouches and stays; a second
+  stands. Holding X is the same as one press. Every "prone" leg in
+  every probe was a crouch-walk, which does pass under containers.
+- The gated route's north leg has crossed the west alley alive
+  (probe 44, frame at the alley's north end), and died at the
+  container junction shortly after. Other samples die mid-alley,
+  head-on into the patrolling guard (probe 37), at the junction
+  (44, 53), or in the alley on the wall clock (68, dense frames:
+  guard raising the alert at copy ~47500, Snake shot by ~49000).
+- Probe 13 - the November wall-clock run that reached the barrels
+  - does not reproduce on the post-F390/F392 tree: same script dies
+  in the alley. Host timing changes moved every patrol phase, so
+  no absolute or gate-relative offset from before those fixes can
+  be trusted; phases must be re-measured on this tree.
+- Very Easy is not selectable blind: held stick-up wraps the main
+  menu into Dog Tag Viewer (probe 58), and menu-appear fields vary
+  by more than the level-select window (~500 fields) between runs
+  on both clocks (probes 40/41/59-63). It wants a menu-state signal.
+- Two dead ends, recorded so they are not re-walked: the lone
+  REL-window position candidate (0x7F47A5B4, monotonic across four
+  RAM dumps) is render scratch rewritten every frame, and the
+  0x8027E2Fx MEM1 cluster that differs menu-vs-level-select is heap
+  churn. Menu and level-select RAM dumps are kept alongside the
+  probe scripts for whoever picks the signal hunt up; the clean
+  next step is a player-position word (three gameplay dumps are
+  also kept) and a guest-word gate type beside the reads gate.
+
+Steps-clock runs also still wedge intermittently in the async GX
+path at unrelated points (boot card mount once, copy ~7320 once)
+at a rate of roughly one run in three; the wall clock and GX_SYNC
+do not. That is the same race family F392 narrowed, not closed.
+
 ### F391 (fork, 2026-11-15) — pad-script gates; probe 44 passes the alley guard, then wedges
 
 `MGS_PAD_SCRIPT` entries can now be gates: `G<count>:...` ends a
