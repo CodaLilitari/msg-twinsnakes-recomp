@@ -16530,6 +16530,16 @@ path at unrelated points (boot card mount once, copy ~7320 once)
 at a rate of roughly one run in three; the wall clock and GX_SYNC
 do not. That is the same race family F392 narrowed, not closed.
 
+Two F393 details have since been pinned down (2026-11-17, probes
+68-78, all frame-evidenced): the spawn platform is a patrol blind
+spot and is rail-enclosed with the north gate as its only exit, so
+there is no southern trench bypass of the west alley; and a second
+EE-edge refinement (single refused-cause re-raise instead of the
+shipped pend+PE forcing) was tried and reverted uncommitted after
+it throttled FMV throughput ~25x - the shipped F392 form stands.
+The remaining unclosed item is a steps-clock-only FMV wedge at
+video frame ~7320, hit twice at the same point.
+
 ### F391 (fork, 2026-11-15) — pad-script gates; probe 44 passes the alley guard, then wedges
 
 `MGS_PAD_SCRIPT` entries can now be gates: `G<count>:...` ends a
