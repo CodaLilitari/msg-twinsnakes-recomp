@@ -89,6 +89,29 @@ int main(void)
     tick(&m, 4);
     CHECK(m.pad_forced == 0x0200);
 
+    /* A guest-word gate releases on the signed 16-bit word reaching
+     * its threshold, and re-bases the clock like a reads gate. */
+    {
+        MgsMmio wm;
+        GuestMemory mem;
+        set_script("2:0100,W0x80010004=-1000:0,3:0200");
+        memset(&mem, 0, sizeof mem);
+        CHECK(guest_memory_init(&mem));
+        mgs_mmio_init(&wm);
+        wm.exi_mem = &mem;
+        CHECK(wm.pad_script_n == 3);
+        CHECK(wm.pad_script_gate[1] == 2u);
+        CHECK(wm.pad_script_expect[1] == -1000);
+        guest_write16(&mem, 0x80010004u, (uint16_t)-2000);
+        tick(&wm, 30);
+        CHECK(wm.pad_forced == 0x0100);
+        guest_write16(&mem, 0x80010004u, (uint16_t)-1000);
+        tick(&wm, 1);
+        CHECK(wm.pad_forced == 0);
+        tick(&wm, 3);
+        CHECK(wm.pad_forced == 0x0200);
+    }
+
     printf(failures ? "%d failure(s)\n" : "all pad_gate checks passed\n",
            failures);
     return failures != 0;

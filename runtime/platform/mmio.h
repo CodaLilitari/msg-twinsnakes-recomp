@@ -176,15 +176,20 @@ typedef struct MgsMmio {
     uint16_t pad_script_btn[MGS_PAD_SCRIPT_MAX];
     uint8_t  pad_script_sx[MGS_PAD_SCRIPT_MAX];   /* optional :sx:sy (hex) */
     uint8_t  pad_script_sy[MGS_PAD_SCRIPT_MAX];
-    /* Gate entries ("G<count>:..." in the script) end a segment: the
-     * entries after one are timed from when the host counter the gate
-     * names (completed disc reads) reaches its count, not from boot.
-     * Menus and codecs consume variable fields even on a deterministic
-     * guest clock, so a phase that must begin AT a game event - level
-     * select open, player control at the Dock - is anchored to the read
-     * that loads it instead of to an absolute field that drifts. For a
-     * gate entry pad_script_frame holds the read count. */
-    uint8_t  pad_script_gate[MGS_PAD_SCRIPT_MAX];
+    /* Gate entries end a segment: the entries after one are timed
+     * from when its condition is met, not from boot. Menus and codecs
+     * consume variable fields even on a deterministic guest clock, so
+     * a phase that must begin AT a game event is anchored to an event
+     * instead of to an absolute field that drifts. "G<count>:..."
+     * waits for the host counter (completed disc reads) - for a gate
+     * entry pad_script_frame holds the read count. "W<addr>=<value>:"
+     * waits until the signed 16-bit guest word at <addr> (in
+     * pad_script_frame, threshold in pad_script_expect) reaches
+     * <value> - how a script navigates by a coordinate the game
+     * itself maintains, closed-loop, instead of by timings that a
+     * guard's patrol phase defeats every other run. */
+    uint8_t  pad_script_gate[MGS_PAD_SCRIPT_MAX];   /* 0 timed, 1 reads, 2 word */
+    int32_t  pad_script_expect[MGS_PAD_SCRIPT_MAX];
     unsigned pad_script_n;
     unsigned pad_seg_base;   /* first entry of the current segment */
     uint32_t pad_frame;      /* fields since the segment began */

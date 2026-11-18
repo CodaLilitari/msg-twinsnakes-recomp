@@ -453,19 +453,31 @@ void mgs_mmio_init(MgsMmio* m)
          * An entry whose frame is G<count> is a gate: it ends the
          * segment, and frames after it count from when the host's gate
          * counter (completed disc reads) reaches <count>. The button
-         * word on a gate is parsed for uniformity and not used. */
+         * word on a gate is parsed for uniformity and not used.
+         * W<addr>=<value> is the guest-word form: release when the
+         * signed 16-bit word at the guest address reaches the value. */
         {
             const char* q = getenv("MGS_PAD_SCRIPT");
             m->pad_script_n = 0u;
             while (q && *q && m->pad_script_n < MGS_PAD_SCRIPT_MAX) {
                 char* end;
-                int gate = (*q == 'G' || *q == 'g');
+                int gate = (*q == 'G' || *q == 'g') ? 1 :
+                           (*q == 'W' || *q == 'w') ? 2 : 0;
                 unsigned long fr;
+                long expect = 0;
                 if (gate) ++q;
                 fr = strtoul(q, &end, 0);
-                if (end == q || *end != ':') break;
+                if (end == q) break;
+                if (gate == 2) {
+                    if (*end != '=') break;
+                    q = end + 1;
+                    expect = strtol(q, &end, 0);
+                    if (end == q) break;
+                }
+                if (*end != ':') break;
                 q = end + 1;
                 m->pad_script_gate[m->pad_script_n] = (uint8_t)gate;
+                m->pad_script_expect[m->pad_script_n] = (int32_t)expect;
                 m->pad_script_frame[m->pad_script_n] = (uint32_t)fr;
                 m->pad_script_btn[m->pad_script_n] =
                     (uint16_t)strtoul(q, &end, 16);
@@ -1434,8 +1446,20 @@ void mgs_mmio_tick_frame(MgsMmio* m)
                 seg_end = m->pad_script_frame[i];
         }
         if (gate < m->pad_script_n && m->pad_frame > seg_end) {
-            uint64_t count = m->pad_gate_fn ? m->pad_gate_fn() : ~0ull;
-            if (count >= (uint64_t)m->pad_script_frame[gate]) {
+            /* With no counter (reads) or no guest memory (word) wired,
+             * a gate releases on segment timing alone, so a script
+             * never hangs in a build that has neither. */
+            int met;
+            if (m->pad_script_gate[gate] == 2u) {
+                met = !m->exi_mem ||
+                      (int32_t)(int16_t)guest_read16(
+                          m->exi_mem, m->pad_script_frame[gate]) >=
+                          m->pad_script_expect[gate];
+            } else {
+                uint64_t count = m->pad_gate_fn ? m->pad_gate_fn() : ~0ull;
+                met = count >= (uint64_t)m->pad_script_frame[gate];
+            }
+            if (met) {
                 m->pad_seg_base = gate + 1u;
                 m->pad_frame = 0u;
                 gate = m->pad_script_n;

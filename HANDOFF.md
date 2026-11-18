@@ -16540,6 +16540,30 @@ it throttled FMV throughput ~25x - the shipped F392 form stands.
 The remaining unclosed item is a steps-clock-only FMV wedge at
 video frame ~7320, hit twice at the same point.
 
+### F394 (fork, 2026-11-17) — guest-word pad gates; east route also dies on its north leg
+
+Pad-script gates gain a second form beside the reads gate of
+F391: `W<addr>=<value>:...` ends a segment and re-bases the
+following entries' frames on the signed 16-bit guest word at the
+address reaching the value - the closed loop F393 asked for, in
+the mechanism at least. It is unit-pinned in
+`tests/test_pad_gate.c` alongside the reads form. What it does not
+yet have is a validated word to wait on: the hunts so far produced
+two frame-evidenced dead ends worth recording. The lone REL-window
+triple that looked like position across four RAM dumps
+(0x7F47A5B4) is render scratch rewritten every frame, and its
+four-dump monotonicity was selection effect. The cleanest MEM1
+cluster from a stillness-filtered five-dump scan (0x8145FAD0) is
+never written in a live run at all - cross-run heap variance, the
+same trap. Dumps and diff tooling are kept with the probe scripts.
+
+Route attempt of record: east-first (probe 82) also dies, on its
+north leg along the east walkway; with the west-alley and junction
+deaths that makes every open-loop line into the lift a patrol-phase
+lottery on this tree, at either difficulty the scripts have
+reached so far. The next route work should start from a validated
+position word and these gates, not from another timing sample.
+
 ### F391 (fork, 2026-11-15) — pad-script gates; probe 44 passes the alley guard, then wedges
 
 `MGS_PAD_SCRIPT` entries can now be gates: `G<count>:...` ends a
