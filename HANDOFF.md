@@ -16641,3 +16641,33 @@ refusals the aliasing used to swallow are mostly audio-DMA offers
 the guest now actually services. That cost is reported, not hidden;
 if it ever bites, the due_aid cadence is the knob, not this edge.
 
+### F395 (fork, 2026-11-18) — respawn reads nothing; the death cycle is scriptable, the anchor is not in the disc
+
+Three measurement probes (85-87, wall clock, heartbeat reads) settle
+the respawn-anchor idea F394 left open - by killing it. The full
+death cycle scripts cleanly: gated crouch-crawl out of the spawn
+platform, stand and run north in the west alley, death to the
+white-camo guard, GAME OVER, A-taps take CONTINUE, Snake back at
+the Dock spawn (probe 87 frames: alley 0038/0044, CONTINUE screen
+0060, respawned 0090; 148,052 fields, 0 GX desync). But the reads
+timeline shows no second Dock burst: after the stage-load burst
+ends (~1410 reads), completed reads creep at ~1 per 55 fields
+through the death, the GAME OVER screen and the respawn alike,
+with one +16 blip for the GAME OVER assets. A Dock respawn
+performs no disc reads at all - the stage stays resident and only
+actors reset - so a reads gate cannot anchor patrol phase at
+respawn, and neither can any other counter the host already has.
+If a respawn anchor is ever wanted it has to be a W gate on a
+guest word, with the same discovery problem as position.
+
+Two smaller facts from the same probes, for whoever scripts next.
+A standing run north cannot leave the spawn platform: the railing
+blocks it and Snake presses there indefinitely (probes 85/86
+frames); the crouch-walk passes under it, which is why every
+working leg since probe 44 crouches first. And the step clock
+still wedges intermittently in async GX even after F392 - probe 84
+froze at frame 1295 / 406 reads with steps burning, the same
+boot-region point wall clock passes; F392 closed the draw-done
+EE-edge case, not this one. Route attempts stay on the wall clock
+until that is diagnosed.
+
