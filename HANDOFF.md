@@ -16671,3 +16671,39 @@ boot-region point wall clock passes; F392 closed the draw-done
 EE-edge case, not this one. Route attempts stay on the wall clock
 until that is diagnosed.
 
+### F396 (fork, 2026-11-18) — menu sequence mapped; Very Easy is scriptable; gated events repeat to ~100 fields
+
+Probes 88-91 (wall clock) map the front end the route scripts
+drive blind. Idle boot plays logos then the opening cinematic;
+the Start taps in every working script skip the cinematic, which
+is what the reads burst to 592 at fields ~1580 is (title/main-menu
+load after the skip; idle, reads just creep through the movie).
+With the standard spam the screens land at XFB copies ~1700
+(title), 2300 (main menu), 2600-2900 (GAME LEVEL SELECT), 3200
+(radar select). Heartbeat "frames" are fields: ~2 per copy in
+30 fps gameplay, ~1 per copy in the 60 fps menus, which is why
+copy-aligned frame comparison across runs drifts even when the
+field timeline repeats.
+
+Very Easy - unreachable while the spam's A taps confirmed NORMAL
+on their way through - is reached by Start-only spam (confirms
+nothing; lands in the main menu), then spaced A / stick-up /
+stick-up / A / A at script fields 5600/6200/6800/7800/8400.
+Probe 91 frames catch VERY EASY centred in the level-select slot
+through a 1000-field verification pause, then radar select, then
+the Cargo Dock title. The Dock burst on this path is reads
+1146->1503 (same ~357-read burst, higher pre-burst creep from the
+longer front end), so the route gate moves from G1060 to G1400;
+G1060 would fire inside the intro FMV.
+
+Determinism, measured on the NORMAL path: probes 87 and 88 ran
+byte-identical scripts and their gate-relative landmarks agree to
+~100 fields (Dock burst end 6443 vs 6548 fields; the GAME OVER
+asset blip 60,102 vs 60,204 fields after the gate point). That is
+two orders tighter than the open-loop arrival-phase deaths of
+probes 21/22 and makes route tuning by iteration a convergent
+process rather than a lottery resample - on the wall clock. The
+forced-death landmark is a weak patrol-phase probe (8500 fields
+of exposure), so ~100 fields is an upper bound on event jitter,
+not a measured patrol-phase spread.
+
