@@ -16707,3 +16707,28 @@ forced-death landmark is a weak patrol-phase probe (8500 fields
 of exposure), so ~100 fields is an upper bound on event jitter,
 not a measured patrol-phase spread.
 
+### F397 (fork, 2026-11-18) — the spawn-platform exit is a slow slide to a crawl-under gap
+
+Probes 92-95 (wall clock, Very Easy) re-measure the first route
+leg and overturn its folklore. The crouch-crawl north from spawn
+does exit the Dock spawn platform, but not promptly: Snake
+presses crouched against the west railing section for ~11k
+fields, slides east imperceptibly, and ducks under the railing
+at the centre pillar (dense frames, probe 95: pressed at idx 190,
+through by 193). Gate-relative exit ~53.5-54.5k fields whether
+the stick is full tilt (80:FF) or half (80:C0), with the crawl
+starting at 42.5k in both - so full tilt does not vault him, and
+probe 44's leg timings (east at 51k) turned before the exit it
+assumed had happened; its one alley pass and the east-leg deaths
+since (probes 92/93 die gate-relative ~54-58k, shortly after the
+real exit) should be re-read with the exit at ~54k, not 42.5k.
+
+Two scripting facts from the same probes. `MGS_SAVE_SEQ`
+sequences cap at 240 frames: a save window that starts too early
+silently ends before the route legs (probe 92 captured no route
+frames at all), so budget `MGS_SAVE_FROM_COPY`/`EVERY` against
+the cap. And XFB copies lag fields by a content-dependent ratio
+(~1.0 in menus, 1.35-1.7 through the Dock), so copy numbers are
+not a field clock; the heartbeat's fields column is the timeline
+to reason in.
+
