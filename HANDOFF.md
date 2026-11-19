@@ -16732,3 +16732,35 @@ the cap. And XFB copies lag fields by a content-dependent ratio
 not a field clock; the heartbeat's fields column is the timeline
 to reason in.
 
+### F398 (fork, 2026-11-18) — the west channel is a sightline; emergence phase is the whole game
+
+Probes 97-100 (wall clock, Very Easy) map what the crawl-under
+exit of F397 actually leads into. The underpass beneath the vent
+structure north of spawn emerges at the south end of a straight
+west channel between the outer wall and the container stacks.
+Two genome guards cover it: one patrols the channel itself, one
+the east walkway. Emergence is spotted essentially instantly
+whenever the channel guard is facing south anywhere in the
+channel (probe 99 frames: guard at the far north end with the
+red mark the moment Snake clears the underpass), and a
+stationary crouched Snake at the channel mouth is killed the
+same way - there is no observation post there.
+
+Phase samples so far, as survival after gate-relative emergence
+(crawl start + ~9k fields of slide/underpass): start 31k ->
+spotted at emergence, dead ~1k fields later (probes 97/99);
+start 41k -> ~1.3k fields unspotted in the channel before the
+guard returns from the north, dead ~3.8k after emergence
+(probe 100). The window that works is emerging as the guard
+turns north at the south end and following behind him, or
+peeling east under the first container before his turn. Which
+offset lands there is still being bisected; the death blip in
+the heartbeat (a +16 GAME OVER asset burst) makes each sample
+readable without frames.
+
+Also recorded: one host access-violation (0xC0000005) at fields
+~24k during the codec taps (probe 98), not reproduced by an
+identical rerun (probe 99, exit 0). No orphan process or memory
+pressure explained it; left as a single-instance flake to watch,
+not a diagnosis.
+
