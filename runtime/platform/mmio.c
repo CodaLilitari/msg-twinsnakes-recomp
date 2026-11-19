@@ -1460,6 +1460,11 @@ void mgs_mmio_tick_frame(MgsMmio* m)
                 met = count >= (uint64_t)m->pad_script_frame[gate];
             }
             if (met) {
+                if (getenv("MGS_PAD_TRACE"))
+                    fprintf(stderr, "[padt] gate %u released at field %llu "
+                                    "frame %u\n", gate,
+                            (unsigned long long)m->field_count,
+                            (unsigned)m->pad_frame);
                 m->pad_seg_base = gate + 1u;
                 m->pad_frame = 0u;
                 gate = m->pad_script_n;
@@ -1476,6 +1481,21 @@ void mgs_mmio_tick_frame(MgsMmio* m)
         m->pad_forced = held;
         m->pad_stick_x = held_sx;
         m->pad_stick_y = held_sy;
+        if (getenv("MGS_PAD_TRACE")) {
+            static uint16_t prev_btn;
+            static uint8_t prev_sx, prev_sy;
+            static int prev_init;
+            if (!prev_init || held != prev_btn || held_sx != prev_sx ||
+                held_sy != prev_sy) {
+                fprintf(stderr, "[padt] field %llu frame %u btn %04X "
+                                "stick %02X %02X\n",
+                        (unsigned long long)m->field_count,
+                        (unsigned)m->pad_frame, (unsigned)held,
+                        (unsigned)held_sx, (unsigned)held_sy);
+                prev_btn = held; prev_sx = held_sx; prev_sy = held_sy;
+                prev_init = 1;
+            }
+        }
         ++m->pad_frame;
     }
 

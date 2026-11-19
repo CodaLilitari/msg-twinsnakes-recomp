@@ -16764,3 +16764,27 @@ identical rerun (probe 99, exit 0). No orphan process or memory
 pressure explained it; left as a single-instance flake to watch,
 not a diagnosis.
 
+### F399 (fork, 2026-11-18) — MGS_PAD_TRACE; script frames are VI fields, heartbeat frames are EFB copies
+
+`MGS_PAD_TRACE=1` makes the pad tick print `[padt]` lines on
+stderr: gate releases and every held-state change, each with the
+VI field count and the segment-relative script frame. Env-gated
+and inert otherwise; no test changed (the tick's logic is
+untouched, and the suite stays 29/29).
+
+It exists because two clocks were being read as one. Script
+entries tick once per VI retrace (`mgs_mmio_tick_frame` at
+`due_vi`), while the heartbeat's "frames" are EFB copies
+(`host/main.c` progress_counter). On the Very Easy path the
+G1400 gate released at VI field 16086 with heartbeat copies at
+10817, and a stick entry at script frame 50000 fired at field
+66086 with copies at 74243 - copies run ~1.27x script frames
+across the post-gate span, content-dependent. Every emergence
+and transit number derived from heartbeat deltas in F397/F398
+is in copies, not script frames: the underpass transit is
+~1.5k script frames, not ~9-11k, and leg timings ported from
+step-clock probes (where copies, fields and script frames run
+~1:1:1, F391) land at different game phases on the wall clock.
+Reason in script frames; convert with a same-run [padt]/[beat]
+pair, never a global constant.
+
